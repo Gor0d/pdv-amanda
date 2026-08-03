@@ -16,9 +16,19 @@ files:
 asarUnpack:
   - '**/node_modules/better-sqlite3/**'
 
+# O better-sqlite3 13 já traz prebuilds N-API por plataforma. Deixar o
+# electron-builder recompilar exigiria Visual Studio Build Tools na máquina de
+# quem gera o instalador, sem nenhum ganho.
+npmRebuild: false
+
 win:
   target:
     - nsis
+  # Ver docs/build-windows.md: sem o Modo de Desenvolvedor do Windows ligado, o
+  # electron-builder nao consegue extrair o pacote winCodeSign (ele contem
+  # symlinks de macOS) e o build para. Desligar esta etapa evita esse download.
+  # Custo: o .exe sai sem icone e sem metadados de versao.
+  signAndEditExecutable: false
   artifactName: ${productName} ${version} - instalador.${ext}
 
 nsis:
