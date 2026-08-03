@@ -1,0 +1,280 @@
+/* Tokens e componentes portados do protótipo pdv.html.
+   A paleta e o formato de "cupom" são o que a dona da loja já reconhece —
+   mudar isso sem motivo seria custo puro.
+
+   As fontes do protótipo vinham do Google Fonts. Aqui usamos a pilha do
+   sistema: o app precisa abrir igual com a internet caída, e a CSP proíbe
+   qualquer requisição externa. Para voltar ao tipo original, basta soltar os
+   .woff2 em src/renderer/fontes/ e declarar @font-face aqui. */
+
+:root {
+  --bg: #F4F2EA;
+  --ink: #1F2A22;
+  --ink-soft: #5B6459;
+  --paper: #FFFFFF;
+  --paper-edge: #E6E1D3;
+  --green: #2E7D5B;
+  --green-dark: #1E5C41;
+  --green-pale: #E5F1EA;
+  --rust: #B24A2A;
+  --rust-pale: #FBEAE3;
+  --amber: #B4802A;
+  --amber-pale: #FBF1DF;
+  --line: #DAD5C6;
+
+  --fonte-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --fonte-display: 'Segoe UI Variable Display', 'Segoe UI Semibold', system-ui, sans-serif;
+  --fonte-mono: 'Cascadia Mono', 'Consolas', 'JetBrains Mono', 'Courier New', monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--fonte-ui);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+.mono { font-family: var(--fonte-mono); font-variant-numeric: tabular-nums; }
+.display { font-family: var(--fonte-display); }
+
+/* ------------------------------- Cabeçalho ------------------------------- */
+
+header {
+  background: var(--ink);
+  color: #F4F2EA;
+  padding: 14px 20px 0 20px;
+}
+header h1 {
+  font-family: var(--fonte-display);
+  font-size: 19px;
+  margin: 0 0 12px 0;
+  letter-spacing: 0.2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+header h1 .dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--green); display: inline-block;
+}
+header h1 .versao {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: #8E978C;
+  font-family: var(--fonte-mono);
+}
+
+nav { display: flex; gap: 4px; }
+nav button {
+  background: transparent;
+  border: none;
+  color: #C9CFC7;
+  font-family: var(--fonte-ui);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 16px;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: color .15s ease;
+}
+nav button:hover { color: #fff; }
+nav button.active { color: #fff; border-bottom-color: var(--green); }
+
+main { max-width: 980px; margin: 0 auto; padding: 22px 20px 60px 20px; }
+.tab { display: none; }
+.tab.active { display: block; animation: fade .18s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* --------------------------------- Cards --------------------------------- */
+
+.card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px;
+}
+.card + .card { margin-top: 16px; }
+.card h2 {
+  font-family: var(--fonte-display);
+  font-size: 15px;
+  margin: 0 0 14px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--ink-soft);
+}
+
+/* -------------------------------- Botões --------------------------------- */
+
+.btn {
+  flex: 1;
+  padding: 13px 16px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  font-size: 14.5px;
+  cursor: pointer;
+  font-family: var(--fonte-ui);
+  transition: background .15s ease, opacity .15s ease, transform .05s ease;
+}
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-primary { background: var(--green); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--green-dark); }
+.btn-ghost { background: transparent; color: var(--ink-soft); border: 1px solid var(--line); }
+.btn-ghost:hover:not(:disabled) { background: var(--bg); }
+.btn-perigo { background: var(--rust-pale); color: var(--rust); border: 1px solid var(--rust); }
+.btn-perigo:hover:not(:disabled) { background: var(--rust); color: #fff; }
+.btn-row { display: flex; gap: 10px; margin-top: 14px; }
+.btn-compacto { flex: 0 0 auto; padding: 9px 14px; font-size: 13.5px; }
+
+.icon-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 14px; color: var(--ink-soft); padding: 2px 6px;
+}
+.icon-btn:hover { color: var(--ink); }
+.icon-btn.del:hover { color: var(--rust); }
+
+/* ------------------------- Mensagens e feedback -------------------------- */
+
+.msg {
+  margin-top: 10px; padding: 10px 12px; border-radius: 6px;
+  font-size: 13.5px; display: none;
+}
+.msg.show { display: block; }
+.msg.err  { background: var(--rust-pale);  color: var(--rust); }
+.msg.warn { background: var(--amber-pale); color: var(--amber); }
+.msg.ok   { background: var(--green-pale); color: var(--green-dark); }
+
+.toast {
+  position: fixed; bottom: 22px; left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  background: var(--ink); color: #fff;
+  padding: 12px 20px; border-radius: 8px; font-size: 13.5px;
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+  z-index: 50; max-width: 80vw; text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.err { background: var(--rust); }
+
+/* Barra de status persistente. Herda o padrão do #save-banner do protótipo,
+   mas agora mostra o estado do sistema em vez de falha de gravação. */
+#status-bar {
+  display: flex; align-items: center; gap: 18px;
+  background: #2A362D; color: #C9CFC7;
+  font-size: 12.5px; padding: 7px 20px;
+  border-bottom: 1px solid #1a231c;
+}
+#status-bar .item { display: flex; align-items: center; gap: 6px; }
+#status-bar .item b { color: #fff; font-weight: 600; }
+#status-bar .espaco { flex: 1; }
+#status-bar .alerta { color: var(--amber); }
+
+/* -------------------------- Formulários e tabelas ------------------------ */
+
+label {
+  display: block; font-size: 11.5px; text-transform: uppercase;
+  letter-spacing: .4px; color: var(--ink-soft); margin-bottom: 5px;
+}
+input, select, textarea {
+  width: 100%; padding: 10px 11px;
+  border: 1.5px solid var(--line); border-radius: 6px;
+  font-size: 14px; font-family: var(--fonte-ui);
+  outline: none; background: #fff; color: var(--ink);
+}
+input:focus, select:focus, textarea:focus { border-color: var(--green); }
+input[type=number] { font-family: var(--fonte-mono); }
+
+.form-grid { display: grid; gap: 10px; align-items: end; }
+.form-grid.produto { grid-template-columns: 1.2fr 2fr 1fr 1fr auto; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+th {
+  text-align: left; font-size: 11px; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--ink-soft);
+  padding: 8px 10px; border-bottom: 2px solid var(--line);
+}
+td { padding: 10px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+td.num, th.num { text-align: right; font-family: var(--fonte-mono); font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: #FBFAF6; }
+tr.low  td.stockcell { color: var(--amber); font-weight: 700; }
+tr.zero td.stockcell { color: var(--rust);  font-weight: 700; }
+tr.inativo td { opacity: .5; }
+
+.empty-state { text-align: center; padding: 30px 10px; color: var(--ink-soft); font-size: 13.5px; }
+.tabela-rolagem { overflow-x: auto; }
+
+/* --------------------------------- Modal -------------------------------- */
+
+.modal-fundo {
+  position: fixed; inset: 0; background: rgba(31,42,34,.55);
+  display: none; align-items: center; justify-content: center; z-index: 100;
+  padding: 20px;
+}
+.modal-fundo.show { display: flex; }
+.modal {
+  background: var(--paper); border-radius: 12px; padding: 22px;
+  width: 100%; max-width: 460px; max-height: 85vh; overflow-y: auto;
+  box-shadow: 0 18px 50px rgba(0,0,0,.25);
+}
+.modal h3 {
+  font-family: var(--fonte-display); font-size: 16px; margin: 0 0 4px 0;
+}
+.modal .sub { font-size: 13px; color: var(--ink-soft); margin-bottom: 16px; }
+
+/* ------------------------------ Utilitários ------------------------------
+   A CSP do app é estrita (`style-src 'self'`), o que bloqueia atributos
+   style="" — inclusive os que o próprio código gera. Em vez de abrir a
+   política com 'unsafe-inline', os poucos ajustes pontuais viram estas
+   classes. Nomes descrevem o papel, não o valor. */
+
+.acoes-linha  { text-align: right; white-space: nowrap; }
+.grid-2       { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-campos  { display: grid; gap: 12px; }
+.clicavel     { cursor: pointer; }
+
+.txt-perigo   { color: var(--rust); }
+.txt-ok       { color: var(--green-dark); }
+.txt-suave    { color: var(--ink-soft); font-size: 12.5px; }
+.txt-nota     { font-size: 13.5px; color: var(--ink-soft); }
+.txt-mini     { font-size: 12px; color: var(--ink-soft); }
+
+.esp-topo     { margin-top: 16px; }
+.esp-topo-p   { margin-top: 12px; }
+.sem-esp-topo { margin-top: 0; }
+.esp-baixo    { margin-bottom: 10px; }
+
+.bloco-secundario {
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line);
+}
+.aviso-cancelado { margin-top: 12px; font-size: 13px; color: var(--rust); }
+
+.lista-rolagem { margin-top: 12px; max-height: 320px; overflow: auto; }
+.lista-avisos {
+  font-size: 12.5px; color: var(--ink-soft); line-height: 1.6; padding-left: 18px;
+}
+.lista-avisos-resumo { cursor: pointer; font-size: 13px; color: var(--ink-soft); }
+
+.nota-rodape { margin-top: 14px; line-height: 1.5; }
+.total-modal  { font-size: 24px; }
+
+/* Larguras dos grupos de botão: um PDV não deve ter botão de 900px de largura. */
+.acoes-venda  { max-width: 520px; margin: 14px auto 0 auto; }
+.acoes-larga  { max-width: 260px; margin-top: 0; }
+.acoes-curta  { max-width: 220px; }
+.acoes-curta.oculta { display: none; }
+
+/* Cartão que serve só de agrupador, sem moldura própria. */
+.card.sem-moldura { background: transparent; border: none; padding: 0; }
+.receipt.sem-moldura { border: none; padding: 0; }
+
+@media (max-width: 720px) {
+  .form-grid.produto { grid-template-columns: 1fr 1fr; }
+  .grid-2 { grid-template-columns: 1fr; }
+  main { padding: 16px 12px 60px 12px; }
+}

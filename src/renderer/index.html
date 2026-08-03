@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Nada externo entra: sem CDN, sem fonte remota, sem telemetria. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self';">
+<title>Sistema de Vendas</title>
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/telas.css">
+</head>
+<body>
+
+<header>
+  <h1>
+    <span class="dot"></span>Sistema de Vendas
+    <span class="versao" id="hdr-versao"></span>
+  </h1>
+  <nav>
+    <button class="tab-btn active" data-tab="vender">Vender</button>
+    <button class="tab-btn" data-tab="estoque">Estoque</button>
+    <button class="tab-btn" data-tab="relatorios">Relatórios</button>
+    <button class="tab-btn" data-tab="ajustes">Ajustes</button>
+  </nav>
+</header>
+
+<div id="status-bar">
+  <span class="item">Caixa <b id="st-caixa">—</b></span>
+  <span class="item">Impressora <b id="st-impressora">—</b></span>
+  <span class="espaco"></span>
+  <span class="item" id="st-estoque"></span>
+  <span class="item">Último backup <b id="st-backup">—</b></span>
+</div>
+
+<main>
+
+  <!-- ============================== VENDER ============================== -->
+  <section id="tab-vender" class="tab active">
+    <div class="card">
+      <h2>Bipar mercadoria</h2>
+      <div class="scan-row">
+        <input id="scan-input" class="mono" type="text" autocomplete="off" spellcheck="false"
+               placeholder="Bipe o código de barras ou digite e pressione Enter">
+        <button class="btn btn-primary btn-compacto" data-acao="adicionar">Adicionar</button>
+      </div>
+      <div class="scan-hint">
+        O leitor funciona como um teclado: ele digita o código e aperta Enter sozinho.
+        Para vender várias unidades de uma vez, digite <b>3*</b> antes do código.
+      </div>
+      <div id="scan-msg" class="msg"></div>
+    </div>
+
+    <div class="venda-grid">
+      <div>
+        <div class="receipt-wrap">
+          <div class="receipt">
+            <div class="receipt-title">Venda atual</div>
+            <div class="receipt-sub" id="receipt-data"></div>
+            <div id="receipt-body"></div>
+            <div class="rtotal">
+              <span class="label">Total</span>
+              <span class="amount" id="cart-total">R$ 0,00</span>
+            </div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="btn-cancelar" data-acao="cancelar-venda">Cancelar (F12)</button>
+          <button class="btn btn-primary" id="btn-finalizar" data-acao="finalizar">Finalizar venda (F8)</button>
+        </div>
+      </div>
+
+      <div class="card atalhos">
+        <h3>Atalhos</h3>
+        <div class="linha"><span>Buscar produto por nome</span><kbd>F2</kbd></div>
+        <div class="linha"><span>Alterar quantidade</span><kbd>F3</kbd></div>
+        <div class="linha"><span>Remover item</span><kbd>F7</kbd></div>
+        <div class="linha"><span>Finalizar venda</span><kbd>F8</kbd></div>
+        <div class="linha"><span>Cancelar venda</span><kbd>F12</kbd></div>
+        <div class="linha"><span>Navegar itens</span><kbd>↑ ↓</kbd></div>
+        <div class="linha ultima"><span>Quantidade do item</span><kbd>+ −</kbd></div>
+        <p class="nota-rodape">
+          Descontos, formas de pagamento e troco entram na próxima versão.
+          Por enquanto toda venda é registrada como <b>dinheiro</b>.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== ESTOQUE ============================= -->
+  <section id="tab-estoque" class="tab">
+    <div class="card">
+      <h2 id="form-titulo">Cadastrar produto</h2>
+      <div class="form-grid produto">
+        <div>
+          <label for="p-codigo">Código de barras</label>
+          <input id="p-codigo" class="mono" type="text" placeholder="7891000..." autocomplete="off">
+        </div>
+        <div>
+          <label for="p-nome">Nome</label>
+          <input id="p-nome" type="text" placeholder="Nome do produto" autocomplete="off">
+        </div>
+        <div>
+          <label for="p-preco">Preço (R$)</label>
+          <input id="p-preco" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off">
+        </div>
+        <div>
+          <label for="p-estoque">Estoque</label>
+          <input id="p-estoque" type="text" inputmode="decimal" placeholder="0" autocomplete="off">
+        </div>
+        <button class="btn btn-primary" data-acao="salvar-produto">Salvar</button>
+      </div>
+      <div class="btn-row" id="p-acoes-edicao">
+        <button class="btn btn-ghost btn-compacto" data-acao="cancelar-edicao">Cancelar edição</button>
+      </div>
+      <div id="p-msg" class="msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>Produtos cadastrados</h2>
+      <input id="p-busca" type="text" placeholder="Buscar por código ou nome..." autocomplete="off" class="esp-baixo">
+      <div id="produtos-tabela" class="tabela-rolagem"></div>
+    </div>
+  </section>
+
+  <!-- ============================ RELATÓRIOS =========================== -->
+  <section id="tab-relatorios" class="tab">
+    <div class="card">
+      <h2>Relatório do dia</h2>
+      <div class="date-row">
+        <input type="date" id="rel-data">
+        <span class="txt-suave">selecione a data</span>
+      </div>
+      <div id="rel-chips" class="chip-row"></div>
+    </div>
+
+    <div class="card sem-moldura esp-topo">
+      <div class="stat-grid">
+        <div class="stat"><div class="label">Total vendido</div><div class="value" id="rel-total">R$ 0,00</div></div>
+        <div class="stat"><div class="label">Itens vendidos</div><div class="value" id="rel-itens">0</div></div>
+        <div class="stat"><div class="label">Vendas realizadas</div><div class="value" id="rel-vendas">0</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Produtos vendidos no dia</h2>
+      <div id="rel-produtos" class="tabela-rolagem"></div>
+    </div>
+
+    <div class="card">
+      <h2>Vendas do dia</h2>
+      <div id="rel-lista-vendas" class="tabela-rolagem"></div>
+    </div>
+
+    <div class="card">
+      <h2>Estoque atual</h2>
+      <div id="rel-estoque" class="tabela-rolagem"></div>
+    </div>
+  </section>
+
+  <!-- ============================== AJUSTES ============================= -->
+  <section id="tab-ajustes" class="tab">
+    <div class="card">
+      <h2>Dados da loja</h2>
+      <div class="grid-2">
+        <div><label for="cfg-loja_nome">Nome da loja</label><input id="cfg-loja_nome" type="text"></div>
+        <div><label for="cfg-loja_cnpj">CNPJ</label><input id="cfg-loja_cnpj" type="text"></div>
+        <div><label for="cfg-loja_endereco">Endereço</label><input id="cfg-loja_endereco" type="text"></div>
+        <div><label for="cfg-loja_telefone">Telefone</label><input id="cfg-loja_telefone" type="text"></div>
+        <div><label for="cfg-operador_padrao">Operador padrão</label><input id="cfg-operador_padrao" type="text"></div>
+        <div><label for="cfg-estoque_minimo_alerta">Alerta de estoque baixo (unidades)</label>
+             <input id="cfg-estoque_minimo_alerta" type="text" inputmode="numeric"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary btn-compacto" data-acao="salvar-config">Salvar</button>
+      </div>
+      <div id="cfg-msg" class="msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>Trazer dados do sistema anterior</h2>
+      <p class="txt-nota sem-esp-topo">
+        Escolha o arquivo <span class="mono">dados-pdv-AAAA-MM-DD.json</span> gerado pelo botão
+        "Exportar dados" do sistema antigo. Importar o mesmo arquivo duas vezes não duplica nada.
+      </p>
+      <div class="btn-row">
+        <button class="btn btn-primary btn-compacto" data-acao="importar">Escolher arquivo...</button>
+      </div>
+      <div id="import-msg" class="msg"></div>
+      <div id="import-relatorio"></div>
+    </div>
+
+    <div class="card">
+      <h2>Backup e diagnóstico</h2>
+      <div class="btn-row sem-esp-topo">
+        <button class="btn btn-primary btn-compacto" data-acao="backup">Fazer backup agora</button>
+        <button class="btn btn-ghost btn-compacto" data-acao="abrir-pasta">Abrir pasta de backups</button>
+        <button class="btn btn-ghost btn-compacto" data-acao="recalcular">Conferir estoque</button>
+      </div>
+      <div id="sys-msg" class="msg"></div>
+      <div id="sys-info" class="esp-topo"></div>
+    </div>
+
+    <div class="card">
+      <h2>Sobre o comprovante</h2>
+      <div class="aviso-fiscal">
+        <b>Este sistema emite comprovante não-fiscal.</b> O comprovante de venda serve para o
+        cliente conferir a compra, mas <b>não substitui documento fiscal</b>. Se a sua loja é
+        obrigada a emitir NFC-e no seu estado, essa obrigação continua valendo. A emissão de
+        NFC-e está prevista para uma versão futura e o sistema já guarda os dados necessários.
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast" class="toast"></div>
+
+<div class="modal-fundo" id="modal-fundo">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>

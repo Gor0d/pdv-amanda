@@ -1,0 +1,33 @@
+appId: com.pdvamanda.app
+productName: Sistema de Vendas
+copyright: PDV-Amanda
+
+directories:
+  output: dist
+  buildResources: recursos
+
+files:
+  - src/**/*
+  - package.json
+  - '!**/*.map'
+
+# O .node do better-sqlite3 não pode ficar dentro do asar: o processo precisa
+# carregá-lo do disco.
+asarUnpack:
+  - '**/node_modules/better-sqlite3/**'
+
+win:
+  target:
+    - nsis
+  artifactName: ${productName} ${version} - instalador.${ext}
+
+nsis:
+  # Instalador com telas, não "um clique": a dona da loja precisa ver onde
+  # está instalando e conseguir repetir o processo sozinha.
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Sistema de Vendas
+  deleteAppDataOnUninstall: false # nunca apagar o banco da loja ao desinstalar

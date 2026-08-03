@@ -1,0 +1,113 @@
+/* -------------------------------- Vender --------------------------------- */
+
+.scan-row { display: flex; gap: 10px; }
+.scan-row input {
+  flex: 1; font-size: 18px; padding: 14px 16px;
+  border-width: 2px; font-family: var(--fonte-mono);
+  transition: border-color .15s ease;
+}
+.scan-hint { font-size: 12.5px; color: var(--ink-soft); margin-top: 8px; }
+
+.venda-grid { display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-items: start; }
+
+/* O cupom na tela: metáfora visual herdada do protótipo, incluindo a borda
+   serrilhada de papel picotado. */
+.receipt-wrap { max-width: 520px; margin: 18px auto 0 auto; }
+.receipt {
+  background: var(--paper);
+  border: 1px solid var(--paper-edge);
+  padding: 18px 22px 8px 22px;
+  position: relative;
+}
+.receipt::before {
+  content: "";
+  position: absolute; top: -1px; left: 0; right: 0; height: 10px;
+  background: radial-gradient(circle at 8px 0, transparent 5px, var(--bg) 5.5px) 0 -5px / 16px 10px repeat-x;
+}
+.receipt-title {
+  text-align: center; font-family: var(--fonte-display); font-weight: 700;
+  font-size: 14px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--ink-soft); margin-bottom: 4px;
+}
+.receipt-sub { text-align: center; font-size: 11.5px; color: var(--ink-soft); margin-bottom: 14px; }
+.receipt-empty { text-align: center; color: var(--ink-soft); font-size: 13.5px; padding: 30px 0 20px 0; }
+
+.rline {
+  display: flex; align-items: baseline; gap: 6px;
+  padding: 7px 0; border-bottom: 1px dashed var(--paper-edge); font-size: 13.5px;
+}
+.rline.selecionada { background: var(--green-pale); margin: 0 -8px; padding-left: 8px; padding-right: 8px; }
+.rline .name { flex-shrink: 0; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rline .leader { flex: 1; border-bottom: 1px dotted var(--line); height: 1px; margin-bottom: 4px; }
+.rline .qty-ctrl { display: flex; align-items: center; gap: 5px; }
+.rline .qty-ctrl button {
+  width: 20px; height: 20px; border-radius: 4px;
+  border: 1px solid var(--line); background: var(--bg);
+  cursor: pointer; font-size: 13px; line-height: 1; color: var(--ink); padding: 0;
+}
+.rline .qty-ctrl button:hover { border-color: var(--green); }
+.rline .qty { min-width: 34px; text-align: center; }
+.rline .price {
+  font-family: var(--fonte-mono); font-weight: 600;
+  min-width: 78px; text-align: right;
+}
+.rline .rm { color: var(--rust); cursor: pointer; font-size: 15px; margin-left: 4px; }
+
+.rtotal { display: flex; justify-content: space-between; align-items: center; padding: 16px 0 18px 0; }
+.rtotal .label { font-size: 12.5px; text-transform: uppercase; letter-spacing: .8px; color: var(--ink-soft); }
+.rtotal .amount {
+  font-family: var(--fonte-display); font-size: 30px; font-weight: 700;
+  color: var(--green-dark); font-variant-numeric: tabular-nums;
+}
+
+/* Grade de atalhos ao lado do cupom */
+.atalhos { font-size: 12.5px; color: var(--ink-soft); }
+.atalhos h3 {
+  font-family: var(--fonte-display); font-size: 12px; text-transform: uppercase;
+  letter-spacing: .6px; margin: 0 0 10px 0; color: var(--ink-soft);
+}
+.atalhos .linha { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px dotted var(--line); }
+.atalhos .linha.ultima { border-bottom: none; }
+.atalhos kbd {
+  font-family: var(--fonte-mono); font-size: 11px; background: var(--bg);
+  border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 1px 5px;
+}
+
+/* ------------------------------ Relatórios ------------------------------- */
+
+.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.stat { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+.stat .label { font-size: 11.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--ink-soft); }
+.stat .value {
+  font-family: var(--fonte-display); font-size: 24px; font-weight: 700; margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.date-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.date-row input[type=date] { width: auto; }
+.chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.chip {
+  font-size: 12px; padding: 5px 10px; border-radius: 20px;
+  background: var(--bg); border: 1px solid var(--line);
+  cursor: pointer; color: var(--ink-soft);
+}
+.chip:hover { border-color: var(--green); color: var(--green-dark); }
+.chip.ativo { background: var(--green-pale); border-color: var(--green); color: var(--green-dark); }
+
+/* ------------------------------ Ajustes ---------------------------------- */
+
+.linha-info {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 9px 0; border-bottom: 1px dotted var(--line); font-size: 13.5px;
+}
+.linha-info .rotulo { color: var(--ink-soft); }
+.linha-info .valor { font-family: var(--fonte-mono); text-align: right; word-break: break-all; }
+
+.aviso-fiscal {
+  background: var(--amber-pale); border: 1px solid var(--amber);
+  border-radius: 8px; padding: 12px 14px; font-size: 13px; color: #7A5518;
+}
+
+@media (max-width: 900px) {
+  .venda-grid { grid-template-columns: 1fr; }
+  .stat-grid { grid-template-columns: 1fr; }
+}

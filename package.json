@@ -1,0 +1,25 @@
+{
+  "name": "pdv-amanda",
+  "version": "0.1.0",
+  "description": "Sistema de PDV para loja de bairro — vendas, estoque, caixa e crediário",
+  "private": true,
+  "type": "module",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "test": "node testes/rodar.js",
+    "smoke": "electron testes/e2e/fumaca.js",
+    "dist": "electron-builder --win"
+  },
+  "//nota-nativa": "better-sqlite3 13 publica prebuilds N-API por plataforma: não precisa de compilador nem de electron-rebuild. Por isso NÃO existe postinstall com 'electron-builder install-app-deps' aqui — ele exigiria Visual Studio Build Tools e quebraria o npm install.",
+  "dependencies": {
+    "better-sqlite3": "^13.0.2",
+    "electron-log": "^5.2.4",
+    "iconv-lite": "^0.6.3"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^25.1.8"
+  }
+}
