@@ -79,3 +79,6 @@ backup e diagnóstico.
 Toda venda é registrada como **dinheiro pelo valor exato**. Formas de
 pagamento, troco, descontos, impressão do comprovante, fechamento de caixa e
 fiado são as fases seguintes — as tabelas do banco já existem para todos eles.
+
+O que vem a seguir, em ordem, está em
+**[docs/proximos-passos.md](docs/proximos-passos.md)**.
