@@ -21,19 +21,38 @@ o Electron quanto para o app empacotado. Por isso o `electron-builder.yml` tem
 
 ### 2. `Cannot create symbolic link ... winCodeSign`
 
-Para assinar o executável, o `electron-builder` baixa e extrai o pacote
-`winCodeSign`, que contém symlinks de macOS. Criar symlink no Windows exige
-privilégio que uma conta comum não tem, e a extração falha antes de o
-instalador ser gerado.
+O `electron-builder` baixa o pacote `winCodeSign` (que traz o `rcedit`, usado
+para embutir ícone e metadados no `.exe`). Esse pacote contém symlinks de
+macOS, e criar symlink no Windows exige privilégio que uma conta comum não
+tem. A extração falha, o `electron-builder` a considera perdida e tenta de
+novo num diretório temporário novo — em loop, sem nunca gerar o instalador.
 
-Contorno atual: `win.signAndEditExecutable: false` no `electron-builder.yml`.
-O instalador sai normal e funcional, **mas o `.exe` fica sem ícone próprio e
-sem os metadados de versão**.
+**Contorno: pré-extrair o pacote no cache, pulando a pasta `darwin`.**
+Ela só interessa a quem compila para macOS.
 
-Para gerar o instalador completo, ative o **Modo de Desenvolvedor** do Windows
-(Configurações → Sistema → Para desenvolvedores → Modo de Desenvolvedor) e
-remova a linha `signAndEditExecutable: false`. Ative também ao adicionar o
-ícone em `recursos/icone.ico`.
+```bash
+C="$LOCALAPPDATA/electron-builder/Cache/winCodeSign"
+Z="node_modules/7zip-bin/win/x64/7za.exe"
+
+# Um dos .7z já baixados serve — todos têm o mesmo conteúdo.
+"$Z" x "$C/<qualquer>.7z" "-o$C/winCodeSign-2.6.0" -xr'!'darwin -y
+```
+
+O nome do diretório importa: o cache segue a convenção
+`Cache/<ferramenta>/<nome>-<versão>` (dá para conferir olhando o
+`Cache/nsis/`, que extrai sem problema). Com o diretório no lugar, o
+`electron-builder` o encontra e nem tenta baixar.
+
+Depois disso o `npm run dist` roda normal, com ícone e metadados de versão no
+executável.
+
+**Alternativa permanente:** ligar o **Modo de Desenvolvedor** do Windows
+(Configurações → Sistema → Para desenvolvedores), que concede o privilégio de
+symlink e dispensa o contorno acima.
+
+Se um dia precisar sair pelo caminho mais curto, `win.signAndEditExecutable:
+false` faz o build passar sem nenhuma das duas coisas — ao custo de o `.exe`
+sair **sem ícone e sem metadados de versão**.
 
 ## SmartScreen
 

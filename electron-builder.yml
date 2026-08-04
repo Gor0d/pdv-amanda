@@ -24,11 +24,7 @@ npmRebuild: false
 win:
   target:
     - nsis
-  # Ver docs/build-windows.md: sem o Modo de Desenvolvedor do Windows ligado, o
-  # electron-builder nao consegue extrair o pacote winCodeSign (ele contem
-  # symlinks de macOS) e o build para. Desligar esta etapa evita esse download.
-  # Custo: o .exe sai sem icone e sem metadados de versao.
-  signAndEditExecutable: false
+  icon: recursos/icone.ico
   artifactName: ${productName} ${version} - instalador.${ext}
 
 nsis:
@@ -40,4 +36,20 @@ nsis:
   createDesktopShortcut: always
   createStartMenuShortcut: true
   shortcutName: Sistema de Vendas
-  deleteAppDataOnUninstall: false # nunca apagar o banco da loja ao desinstalar
+  runAfterFinish: true
+
+  # 1046 = Português (Brasil). Sem isto o instalador sai em inglês.
+  language: '1046'
+  displayLanguageSelector: false
+
+  # Identidade visual — geradas por recursos/gerar-assets.py.
+  installerIcon: recursos/icone.ico
+  uninstallerIcon: recursos/icone.ico
+  installerHeaderIcon: recursos/icone.ico
+  installerSidebar: recursos/installerSidebar.bmp
+  uninstallerSidebar: recursos/uninstallerSidebar.bmp
+  installerHeader: recursos/installerHeader.bmp
+
+  # Nunca apagar o banco da loja ao desinstalar. O arquivo fica em
+  # %APPDATA%\pdv-amanda\pdv.db e sobrevive a desinstalar e reinstalar.
+  deleteAppDataOnUninstall: false

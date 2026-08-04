@@ -7,7 +7,13 @@ Aplicativo desktop (Electron + SQLite), roda offline, dados na própria máquina
 **O comprovante emitido é não-fiscal.** Não substitui NFC-e. Ver
 [docs/manual-do-usuario.md](docs/manual-do-usuario.md).
 
-## Rodar
+## Instalar (loja)
+
+Guia para quem vai usar, não para quem desenvolve:
+**[docs/instalar.md](docs/instalar.md)**. O instalador fica nas
+[Releases](https://github.com/Gor0d/pdv-amanda/releases).
+
+## Rodar (desenvolvimento)
 
 ```bash
 npm install
