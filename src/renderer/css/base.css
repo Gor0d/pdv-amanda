@@ -191,7 +191,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); }
 input[type=number] { font-family: var(--fonte-mono); }
 
 .form-grid { display: grid; gap: 10px; align-items: end; }
-.form-grid.produto { grid-template-columns: 1.2fr 2fr 1fr 1fr auto; }
+.form-grid.produto { grid-template-columns: 1.2fr 2fr 1fr 1fr 1fr auto; }
 
 table { width: 100%; border-collapse: collapse; margin-top: 4px; }
 th {

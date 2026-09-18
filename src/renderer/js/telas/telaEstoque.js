@@ -22,7 +22,7 @@ export function montar() {
 
   // Enter em qualquer campo do formulário salva — o cadastro é feito no
   // teclado, entre uma venda e outra.
-  for (const campo of ['#p-codigo', '#p-nome', '#p-preco', '#p-estoque']) {
+  for (const campo of ['#p-codigo', '#p-nome', '#p-custo', '#p-preco', '#p-estoque']) {
     $(campo).addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); salvar(); }
     });
@@ -42,13 +42,16 @@ async function salvar() {
   const nome = $('#p-nome').value.trim();
   const precoCentavos = paraCentavos($('#p-preco').value);
   const estoqueMilesimal = paraMilesimal($('#p-estoque').value);
+  const custoTexto = $('#p-custo').value.trim();
+  const custoCentavos = custoTexto ? paraCentavos(custoTexto) : null;
 
   if (!nome) return mostrarMsg('#p-msg', 'Informe o nome do produto.', 'err');
   if (precoCentavos === null) return mostrarMsg('#p-msg', 'Informe um preço válido (ex.: 5,49).', 'err');
+  if (custoTexto && custoCentavos === null) return mostrarMsg('#p-msg', 'Informe um custo válido (ex.: 3,20).', 'err');
 
   if (editandoId) {
     const ok = await tentar(
-      () => api.produtos.atualizar(editandoId, { nome, precoCentavos }),
+      () => api.produtos.atualizar(editandoId, { nome, precoCentavos, custoCentavos }),
       { aoFalhar: (e) => mostrarMsg('#p-msg', e.message, 'err') }
     );
     if (ok === undefined) return;
@@ -78,7 +81,7 @@ async function salvar() {
     toast('Produto atualizado.');
   } else {
     const id = await tentar(
-      () => api.produtos.criar({ nome, precoCentavos, codigos: codigo ? [codigo] : [] }),
+      () => api.produtos.criar({ nome, precoCentavos, custoCentavos, codigos: codigo ? [codigo] : [] }),
       { aoFalhar: (e) => mostrarMsg('#p-msg', e.message, 'err') }
     );
     if (id === undefined) return;
@@ -104,6 +107,7 @@ async function editar(id) {
   editandoId = id;
   $('#p-codigo').value = codigos[0]?.codigo ?? '';
   $('#p-nome').value = p.nome;
+  $('#p-custo').value = p.custo_centavos != null ? (p.custo_centavos / 100).toFixed(2).replace('.', ',') : '';
   $('#p-preco').value = (p.preco_centavos / 100).toFixed(2).replace('.', ',');
   $('#p-estoque').value = formatarQtd(p.estoque_milesimal);
   $('#form-titulo').textContent = `Editando: ${p.nome}`;
@@ -115,7 +119,7 @@ async function editar(id) {
 
 function limparFormulario() {
   editandoId = null;
-  for (const c of ['#p-codigo', '#p-nome', '#p-preco', '#p-estoque']) $(c).value = '';
+  for (const c of ['#p-codigo', '#p-nome', '#p-custo', '#p-preco', '#p-estoque']) $(c).value = '';
   $('#form-titulo').textContent = 'Cadastrar produto';
   $('#p-acoes-edicao').style.display = 'none';
   esconderMsg('#p-msg');
@@ -172,6 +176,13 @@ function abrirEntrada(id, nome) {
   });
 }
 
+/** Margem sobre o preço de venda: (preço - custo) / preço. Sem custo cadastrado, não dá pra calcular. */
+function calcularMargem(custoCentavos, precoCentavos) {
+  if (custoCentavos == null || !precoCentavos) return '—';
+  const margem = ((precoCentavos - custoCentavos) / precoCentavos) * 100;
+  return `${margem.toFixed(1).replace('.', ',')}%`;
+}
+
 // ------------------------------- Tabela ----------------------------------
 
 async function renderizar() {
@@ -191,14 +202,16 @@ async function renderizar() {
   el.innerHTML = `
     <table>
       <thead>
-        <tr><th>Código</th><th>Nome</th><th class="num">Preço</th><th class="num">Estoque</th><th></th></tr>
+        <tr><th>Código</th><th>Nome</th><th class="num">Custo</th><th class="num">Preço</th><th class="num">Margem</th><th class="num">Estoque</th><th></th></tr>
       </thead>
       <tbody>
         ${lista.map((p) => `
           <tr class="${p.estoque_milesimal === 0 ? 'zero' : (p.estoque_milesimal <= minimo ? 'low' : '')}">
             <td class="mono">${escapar(p.codigo ?? '—')}</td>
             <td>${escapar(p.nome)}</td>
+            <td class="num">${p.custo_centavos != null ? formatarBRL(p.custo_centavos) : '—'}</td>
             <td class="num">${formatarBRL(p.preco_centavos)}</td>
+            <td class="num">${calcularMargem(p.custo_centavos, p.preco_centavos)}</td>
             <td class="num stockcell">${p.controla_estoque ? formatarQtd(p.estoque_milesimal) : '—'}</td>
             <td class="acoes-linha">
               <button class="icon-btn" data-acao="entrada" data-id="${p.id}" data-nome="${escapar(p.nome)}" title="Entrada de estoque">↓</button>
