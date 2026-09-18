@@ -142,7 +142,11 @@ async function abrirDetalhe(comandaId) {
         if (linha) escolher(Number(linha.dataset.i));
       });
 
-      caixa.addEventListener('click', (e) => {
+      // Delegar no wrapper (recriado a cada abertura do modal), nunca em
+      // `caixa` (#modal é reaproveitado entre aberturas — um listener nele
+      // acumularia a cada vez que a comanda fosse reaberta, e um clique
+      // acabaria disparando o lançamento várias vezes de uma vez só).
+      caixa.querySelector('.comanda-modal').addEventListener('click', (e) => {
         const el = e.target.closest('[data-acao]');
         if (!el) return;
         if (el.dataset.acao === 'remover-item') removerItem(Number(el.dataset.id), caixa);
