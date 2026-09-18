@@ -8,6 +8,11 @@ import { formatarDataHoraBR } from '/compartilhado/formato/data.js';
 // modal sem reabri-lo a cada item lançado.
 let comandaAtualId = null;
 
+/** "Mesa 4" ou "Mesa 4 · João", conforme o cliente tiver sido identificado. */
+function rotuloComanda(c) {
+  return c.cliente_nome ? `${c.identificador} · ${c.cliente_nome}` : c.identificador;
+}
+
 export function montar() {
   const secao = $('#tab-comandas');
 
@@ -16,9 +21,11 @@ export function montar() {
     if (el.dataset.acao === 'ver-comanda') abrirDetalhe(Number(el.dataset.id));
   });
 
-  $('#cm-identificador').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); abrirComanda(); }
-  });
+  for (const campo of ['#cm-identificador', '#cm-cliente']) {
+    $(campo).addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); abrirComanda(); }
+    });
+  }
 }
 
 export function aoEntrar() {
@@ -37,7 +44,7 @@ async function renderizarLista() {
 
   el.innerHTML = lista.map((c) => `
     <div class="comanda-card" data-acao="ver-comanda" data-id="${c.id}">
-      <div class="identificador">${escapar(c.identificador)}</div>
+      <div class="identificador">${escapar(rotuloComanda(c))}</div>
       <div class="info">
         <span>${c.qtd_itens} ite${c.qtd_itens === 1 ? 'm' : 'ns'}</span>
         <span class="total">${formatarBRL(c.total_centavos)}</span>
@@ -48,16 +55,18 @@ async function renderizarLista() {
 
 async function abrirComanda() {
   const identificador = $('#cm-identificador').value.trim();
+  const clienteNome = $('#cm-cliente').value.trim();
   if (!identificador) return mostrarMsg('#cm-msg', 'Informe a mesa ou o nome do cliente.', 'err');
 
   const id = await tentar(
-    () => api.comandas.abrir({ identificador }),
+    () => api.comandas.abrir({ identificador, clienteNome: clienteNome || null }),
     { aoFalhar: (e) => mostrarMsg('#cm-msg', e.message, 'err') }
   );
   if (id === undefined) return;
 
   $('#cm-identificador').value = '';
-  toast(`Comanda "${identificador}" aberta.`);
+  $('#cm-cliente').value = '';
+  toast(`Comanda "${identificador}${clienteNome ? ' · ' + clienteNome : ''}" aberta.`);
   await renderizarLista();
   abrirDetalhe(id);
 }
@@ -71,7 +80,7 @@ async function abrirDetalhe(comandaId) {
 
   abrirModal(`
     <div class="comanda-modal">
-      <h3>${escapar(comanda.identificador)}</h3>
+      <h3>${escapar(rotuloComanda(comanda))}</h3>
       <div class="sub">Aberta em ${formatarDataHoraBR(comanda.aberta_em)}</div>
 
       <div class="scan-row">
@@ -253,7 +262,7 @@ async function fecharComanda(caixa) {
   // o conteúdo anterior já foi substituído. Se a pessoa recuar, reabrimos a
   // comanda do zero em vez de deixar o modal vazio.
   const ok = await confirmar({
-    titulo: `Fechar "${comanda.identificador}"?`,
+    titulo: `Fechar "${rotuloComanda(comanda)}"?`,
     texto: `Total da comanda: ${formatarBRL(total)}. Isso registra a venda e baixa o estoque dos itens. ` +
            'Por enquanto todo fechamento é registrado como recebido em dinheiro.',
     confirmar: 'Fechar e cobrar'
@@ -267,6 +276,7 @@ async function fecharComanda(caixa) {
   if (r === undefined) return;
 
   fecharModal();
-  toast(`Comanda "${r.identificador}" fechada — venda ${String(r.numero).padStart(6, '0')}, ${formatarBRL(r.totais.totalCentavos)}.`);
+  toast(`Comanda "${rotuloComanda({ identificador: r.identificador, cliente_nome: r.clienteNome })}" fechada — ` +
+        `venda ${String(r.numero).padStart(6, '0')}, ${formatarBRL(r.totais.totalCentavos)}.`);
   renderizarLista();
 }

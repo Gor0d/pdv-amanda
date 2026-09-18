@@ -1,15 +1,21 @@
 import { obterBanco } from '../db/conexao.js';
 import { agoraTimestamp } from '../../compartilhado/formato/data.js';
 
-export function abrir({ identificador, operador, observacoes } = {}) {
+export function abrir({ identificador, clienteNome, operador, observacoes } = {}) {
   const db = obterBanco();
   const ts = agoraTimestamp();
   const info = db
     .prepare(
-      `INSERT INTO comandas (identificador, status, aberta_em, aberta_por, observacoes)
-       VALUES (?, 'aberta', ?, ?, ?)`
+      `INSERT INTO comandas (identificador, cliente_nome, status, aberta_em, aberta_por, observacoes)
+       VALUES (?, ?, 'aberta', ?, ?, ?)`
     )
-    .run(String(identificador).trim(), ts, operador || null, observacoes || null);
+    .run(
+      String(identificador).trim(),
+      clienteNome ? String(clienteNome).trim() : null,
+      ts,
+      operador || null,
+      observacoes || null
+    );
   return info.lastInsertRowid;
 }
 
@@ -17,7 +23,7 @@ export function abrir({ identificador, operador, observacoes } = {}) {
 export function listarAbertas() {
   return obterBanco()
     .prepare(
-      `SELECT c.id, c.identificador, c.aberta_em, c.aberta_por,
+      `SELECT c.id, c.identificador, c.cliente_nome, c.aberta_em, c.aberta_por,
               coalesce((SELECT SUM(i.preco_unit_centavos * i.qtd_milesimal / 1000)
                           FROM comanda_itens i WHERE i.comanda_id = c.id AND i.removido = 0), 0) AS total_centavos,
               coalesce((SELECT count(*) FROM comanda_itens i

@@ -34,13 +34,14 @@ export function fechar(comandaId, { pagamentos, operador, observacoes } = {}, { 
         })),
         pagamentos,
         operador,
-        observacoes: observacoes || `Comanda: ${comanda.identificador}`
+        observacoes: observacoes ||
+          `Comanda: ${comanda.identificador}${comanda.cliente_nome ? ` · ${comanda.cliente_nome}` : ''}`
       },
       { log }
     );
 
     comandasRepo.marcarFechada(comandaId, { vendaId: resultado.vendaId, em: agoraTimestamp() });
 
-    return { ...resultado, identificador: comanda.identificador };
+    return { ...resultado, identificador: comanda.identificador, clienteNome: comanda.cliente_nome };
   })();
 }

@@ -92,9 +92,17 @@
   <section id="tab-comandas" class="tab">
     <div class="card">
       <h2>Abrir comanda</h2>
-      <div class="scan-row">
-        <input id="cm-identificador" type="text" autocomplete="off"
-               placeholder="Mesa 4, João, Balcão...">
+      <div class="grid-2">
+        <div>
+          <label for="cm-identificador">Mesa / local</label>
+          <input id="cm-identificador" type="text" autocomplete="off" placeholder="Mesa 4, Balcão...">
+        </div>
+        <div>
+          <label for="cm-cliente">Nome do cliente (opcional)</label>
+          <input id="cm-cliente" type="text" autocomplete="off" placeholder="Para identificar de quem é a conta">
+        </div>
+      </div>
+      <div class="btn-row">
         <button class="btn btn-primary btn-compacto" data-acao="abrir-comanda">Abrir</button>
       </div>
       <div id="cm-msg" class="msg"></div>

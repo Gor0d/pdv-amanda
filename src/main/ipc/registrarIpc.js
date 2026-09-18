@@ -132,11 +132,11 @@ export function registrarIpc({ log = console } = {}) {
   });
 
   // ------------------------------ Comandas ------------------------------
-  canal('comandas:abrir', ({ identificador, operador, observacoes } = {}) => {
+  canal('comandas:abrir', ({ identificador, clienteNome, operador, observacoes } = {}) => {
     if (!identificador || !String(identificador).trim()) {
       throw new ErroNegocio(CODIGOS.DADOS_INVALIDOS, 'Informe a mesa ou o nome do cliente.');
     }
-    return comandasRepo.abrir({ identificador, operador, observacoes });
+    return comandasRepo.abrir({ identificador, clienteNome, operador, observacoes });
   });
   canal('comandas:listarAbertas', () => comandasRepo.listarAbertas());
   canal('comandas:porId', (id) => comandasRepo.porId(id));
