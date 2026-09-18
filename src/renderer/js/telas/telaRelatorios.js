@@ -1,5 +1,5 @@
 import { api, tentar } from '../api.js';
-import { $, escapar, aoClicar, toast, confirmar, abrirModal, fecharModal } from '../lib/dom.js';
+import { $, escapar, aoClicar, mostrarMsg, esconderMsg, toast, confirmar, abrirModal, fecharModal } from '../lib/dom.js';
 import { formatarBRL, formatarQtd } from '/compartilhado/formato/moeda.js';
 import { formatarDataBR, hojeISO } from '/compartilhado/formato/data.js';
 
@@ -9,26 +9,38 @@ const NOME_FORMA = {
 
 export function montar() {
   const secao = $('#tab-relatorios');
-  $('#rel-data').addEventListener('change', renderizar);
+  $('#rel-data-inicio').addEventListener('change', renderizar);
+  $('#rel-data-fim').addEventListener('change', renderizar);
 
   aoClicar(secao, '[data-acao]', (el) => {
-    if (el.dataset.acao === 'chip') { $('#rel-data').value = el.dataset.data; renderizar(); }
+    if (el.dataset.acao === 'chip') {
+      $('#rel-data-inicio').value = el.dataset.data;
+      $('#rel-data-fim').value = el.dataset.data;
+      renderizar();
+    }
     if (el.dataset.acao === 'cancelar-venda') cancelarVenda(Number(el.dataset.id), el.dataset.numero);
     if (el.dataset.acao === 'ver-venda') verVenda(Number(el.dataset.id));
   });
 }
 
 export function aoEntrar() {
-  if (!$('#rel-data').value) $('#rel-data').value = hojeISO();
+  if (!$('#rel-data-inicio').value) $('#rel-data-inicio').value = hojeISO();
+  if (!$('#rel-data-fim').value) $('#rel-data-fim').value = hojeISO();
   renderizar();
 }
 
 export async function renderizar() {
-  const data = $('#rel-data').value || hojeISO();
+  let dataInicio = $('#rel-data-inicio').value || hojeISO();
+  let dataFim = $('#rel-data-fim').value || hojeISO();
+
+  // Início depois do fim não é erro do operador digitando fora de ordem —
+  // é só o par que faz sentido invertido.
+  if (dataInicio > dataFim) [dataInicio, dataFim] = [dataFim, dataInicio];
+  esconderMsg('#rel-periodo-msg');
 
   const [relatorio, vendas, estoque, dias] = await Promise.all([
-    tentar(() => api.relatorios.doDia(data)),
-    tentar(() => api.vendas.listarDoDia(data)),
+    tentar(() => api.relatorios.doPeriodo(dataInicio, dataFim)),
+    tentar(() => api.vendas.listarDoPeriodo(dataInicio, dataFim)),
     tentar(() => api.relatorios.estoqueAtual()),
     tentar(() => api.relatorios.diasComVenda(10))
   ]);
@@ -39,17 +51,17 @@ export async function renderizar() {
   $('#rel-itens').textContent = formatarQtd(resumo.itens_milesimal);
   $('#rel-vendas').textContent = resumo.qtd_vendas;
 
-  desenharChips(dias || [], data);
+  desenharChips(dias || [], dataInicio, dataFim);
   desenharProdutos(produtos, formas, resumo);
-  desenharVendas(vendas || []);
+  desenharVendas(vendas || [], dataInicio !== dataFim);
   desenharEstoque(estoque || []);
 }
 
-function desenharChips(dias, dataAtual) {
+function desenharChips(dias, dataInicio, dataFim) {
   const el = $('#rel-chips');
   if (!dias.length) { el.innerHTML = ''; return; }
   el.innerHTML = dias.map((d) => `
-    <span class="chip ${d.data === dataAtual ? 'ativo' : ''}" data-acao="chip" data-data="${escapar(d.data)}">
+    <span class="chip ${d.data >= dataInicio && d.data <= dataFim ? 'ativo' : ''}" data-acao="chip" data-data="${escapar(d.data)}">
       ${formatarDataBR(d.data)} · ${formatarBRL(d.total_centavos)}
     </span>
   `).join('');
@@ -58,7 +70,7 @@ function desenharChips(dias, dataAtual) {
 function desenharProdutos(produtos, formas, resumo) {
   const el = $('#rel-produtos');
   if (!produtos.length) {
-    el.innerHTML = '<div class="empty-state">Nenhuma venda registrada nesse dia.</div>';
+    el.innerHTML = '<div class="empty-state">Nenhuma venda registrada nesse período.</div>';
     return;
   }
 
@@ -74,7 +86,7 @@ function desenharProdutos(produtos, formas, resumo) {
 
   const canceladas = resumo.qtd_canceladas
     ? `<div class="aviso-cancelado">
-         ${resumo.qtd_canceladas} venda(s) cancelada(s) no dia, somando ${formatarBRL(resumo.cancelado_centavos)}.
+         ${resumo.qtd_canceladas} venda(s) cancelada(s) no período, somando ${formatarBRL(resumo.cancelado_centavos)}.
        </div>`
     : '';
 
@@ -95,21 +107,25 @@ function desenharProdutos(produtos, formas, resumo) {
   `;
 }
 
-function desenharVendas(vendas) {
+function desenharVendas(vendas, mostrarData) {
   const el = $('#rel-lista-vendas');
   if (!vendas.length) {
-    el.innerHTML = '<div class="empty-state">Nenhuma venda nesse dia.</div>';
+    el.innerHTML = '<div class="empty-state">Nenhuma venda nesse período.</div>';
     return;
   }
   el.innerHTML = `
     <table>
       <thead>
-        <tr><th>Nº</th><th>Hora</th><th class="num">Itens</th><th class="num">Total</th><th>Situação</th><th></th></tr>
+        <tr>
+          <th>Nº</th>${mostrarData ? '<th>Data</th>' : ''}<th>Hora</th>
+          <th class="num">Itens</th><th class="num">Total</th><th>Situação</th><th></th>
+        </tr>
       </thead>
       <tbody>
         ${vendas.map((v) => `
           <tr class="${v.status === 'cancelada' ? 'inativo' : ''}">
             <td class="mono">${String(v.numero).padStart(6, '0')}</td>
+            ${mostrarData ? `<td class="mono">${formatarDataBR(v.data)}</td>` : ''}
             <td class="mono">${escapar(v.hora)}</td>
             <td class="num">${v.qtd_itens}</td>
             <td class="num">${formatarBRL(v.total_centavos)}</td>

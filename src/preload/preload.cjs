@@ -34,14 +34,14 @@ contextBridge.exposeInMainWorld('pdv', {
     finalizar: chamar('vendas:finalizar'),
     cancelar: chamar('vendas:cancelar'),
     porId: chamar('vendas:porId'),
-    listarDoDia: chamar('vendas:listarDoDia'),
+    listarDoPeriodo: chamar('vendas:listarDoPeriodo'),
     rascunhoSalvar: chamar('vendas:rascunhoSalvar'),
     rascunhoLer: chamar('vendas:rascunhoLer'),
     rascunhoLimpar: chamar('vendas:rascunhoLimpar')
   },
 
   relatorios: {
-    doDia: chamar('relatorios:doDia'),
+    doPeriodo: chamar('relatorios:doPeriodo'),
     diasComVenda: chamar('relatorios:diasComVenda'),
     estoqueAtual: chamar('relatorios:estoqueAtual')
   },

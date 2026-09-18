@@ -91,7 +91,7 @@ app.whenReady().then(async () => {
     const totalDepois = await exec(`document.querySelector('#cart-total').textContent`);
     verificar('o carrinho zerou após finalizar', totalDepois.includes('0,00'), `total: ${totalDepois}`);
 
-    const venda = await exec(`window.pdv.vendas.listarDoDia(new Date().toISOString().slice(0,10))`);
+    const venda = await exec(`window.pdv.vendas.listarDoPeriodo(new Date().toISOString().slice(0,10))`);
     verificar('a venda foi gravada no banco', venda.ok && venda.dados.length === 1,
       `vendas encontradas: ${venda.dados?.length}`);
     verificar('o total gravado bate com o da tela', venda.dados?.[0]?.total_centavos === 4878,

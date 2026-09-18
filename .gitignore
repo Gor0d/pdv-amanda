@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-novo/
 logs/
 *.log
 *.db

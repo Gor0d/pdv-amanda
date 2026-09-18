@@ -4,48 +4,53 @@ import { obterBanco } from '../db/conexao.js';
 // de todas as vendas já feitas; com dois anos de histórico isso trava a UI a
 // cada troca de data.
 
-export function resumoDoDia(data) {
+/**
+ * Todo relatório aceita um período (dataInicio..dataFim). Comparação de data
+ * ISO "AAAA-MM-DD" funciona por ordem alfabética, então BETWEEN basta — sem
+ * precisar de Date. Um único dia é só dataInicio === dataFim.
+ */
+export function resumoDoPeriodo(dataInicio, dataFim) {
   return obterBanco()
     .prepare(
       `SELECT coalesce(SUM(total_centavos), 0) AS total_centavos,
               count(*)                         AS qtd_vendas,
               coalesce((SELECT SUM(i.qtd_milesimal)
                           FROM venda_itens i JOIN vendas v2 ON v2.id = i.venda_id
-                         WHERE v2.data = ? AND v2.status = 'finalizada'), 0) AS itens_milesimal,
+                         WHERE v2.data BETWEEN ? AND ? AND v2.status = 'finalizada'), 0) AS itens_milesimal,
               coalesce((SELECT SUM(total_centavos) FROM vendas
-                         WHERE data = ? AND status = 'cancelada'), 0) AS cancelado_centavos,
+                         WHERE data BETWEEN ? AND ? AND status = 'cancelada'), 0) AS cancelado_centavos,
               coalesce((SELECT count(*) FROM vendas
-                         WHERE data = ? AND status = 'cancelada'), 0) AS qtd_canceladas
+                         WHERE data BETWEEN ? AND ? AND status = 'cancelada'), 0) AS qtd_canceladas
          FROM vendas
-        WHERE data = ? AND status = 'finalizada'`
+        WHERE data BETWEEN ? AND ? AND status = 'finalizada'`
     )
-    .get(data, data, data, data);
+    .get(dataInicio, dataFim, dataInicio, dataFim, dataInicio, dataFim, dataInicio, dataFim);
 }
 
-export function produtosDoDia(data) {
+export function produtosDoPeriodo(dataInicio, dataFim) {
   return obterBanco()
     .prepare(
       `SELECT i.descricao, i.codigo_barras,
               SUM(i.qtd_milesimal)        AS qtd_milesimal,
               SUM(i.total_item_centavos)  AS total_centavos
          FROM venda_itens i JOIN vendas v ON v.id = i.venda_id
-        WHERE v.data = ? AND v.status = 'finalizada'
+        WHERE v.data BETWEEN ? AND ? AND v.status = 'finalizada'
         GROUP BY coalesce(i.produto_id, i.descricao), i.descricao, i.codigo_barras
         ORDER BY total_centavos DESC`
     )
-    .all(data);
+    .all(dataInicio, dataFim);
 }
 
-export function porFormaPagamento(data) {
+export function porFormaPagamento(dataInicio, dataFim) {
   return obterBanco()
     .prepare(
       `SELECT p.forma, SUM(p.valor_centavos) AS total_centavos, count(*) AS qtd
          FROM pagamentos p JOIN vendas v ON v.id = p.venda_id
-        WHERE v.data = ? AND v.status = 'finalizada'
+        WHERE v.data BETWEEN ? AND ? AND v.status = 'finalizada'
         GROUP BY p.forma
         ORDER BY total_centavos DESC`
     )
-    .all(data);
+    .all(dataInicio, dataFim);
 }
 
 /** Últimos dias que tiveram venda — alimenta os chips de atalho do relatório. */

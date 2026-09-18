@@ -67,18 +67,19 @@ export function porNumero(numero) {
   return r ? porId(r.id) : null;
 }
 
-export function listarDoDia(data) {
+/** dataFim omitido = mesmo dia de dataInicio (comportamento antigo de "do dia"). */
+export function listarDoPeriodo(dataInicio, dataFim = dataInicio) {
   return obterBanco()
     .prepare(
-      `SELECT v.id, v.numero, v.hora, v.status, v.total_centavos, v.operador,
+      `SELECT v.id, v.numero, v.data, v.hora, v.status, v.total_centavos, v.operador,
               c.nome AS cliente_nome,
               (SELECT group_concat(DISTINCT forma) FROM pagamentos WHERE venda_id = v.id) AS formas,
               (SELECT count(*) FROM venda_itens WHERE venda_id = v.id) AS qtd_itens
          FROM vendas v LEFT JOIN clientes c ON c.id = v.cliente_id
-        WHERE v.data = ?
-        ORDER BY v.numero DESC`
+        WHERE v.data BETWEEN ? AND ?
+        ORDER BY v.data DESC, v.numero DESC`
     )
-    .all(data);
+    .all(dataInicio, dataFim);
 }
 
 export function marcarCancelada({ vendaId, motivo, por, sessaoAtualId, em }) {

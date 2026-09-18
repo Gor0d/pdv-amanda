@@ -130,12 +130,14 @@
   <!-- ============================ RELATÓRIOS =========================== -->
   <section id="tab-relatorios" class="tab">
     <div class="card">
-      <h2>Relatório do dia</h2>
+      <h2>Relatório por período</h2>
       <div class="date-row">
-        <input type="date" id="rel-data">
-        <span class="txt-suave">selecione a data</span>
+        <input type="date" id="rel-data-inicio">
+        <span class="txt-suave">até</span>
+        <input type="date" id="rel-data-fim">
       </div>
       <div id="rel-chips" class="chip-row"></div>
+      <div id="rel-periodo-msg" class="msg"></div>
     </div>
 
     <div class="card sem-moldura esp-topo">
@@ -147,12 +149,12 @@
     </div>
 
     <div class="card">
-      <h2>Produtos vendidos no dia</h2>
+      <h2>Produtos vendidos no período</h2>
       <div id="rel-produtos" class="tabela-rolagem"></div>
     </div>
 
     <div class="card">
-      <h2>Vendas do dia</h2>
+      <h2>Vendas do período</h2>
       <div id="rel-lista-vendas" class="tabela-rolagem"></div>
     </div>
 

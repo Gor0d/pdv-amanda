@@ -118,7 +118,7 @@ export function registrarIpc({ log = console } = {}) {
   canal('vendas:finalizar', (entrada) => vendaServico.finalizar(entrada, { log }));
   canal('vendas:cancelar', (entrada) => vendaServico.cancelar(entrada, { log }));
   canal('vendas:porId', (id) => vendasRepo.porId(id));
-  canal('vendas:listarDoDia', (data) => vendasRepo.listarDoDia(data));
+  canal('vendas:listarDoPeriodo', (dataInicio, dataFim) => vendasRepo.listarDoPeriodo(dataInicio, dataFim));
   canal('vendas:rascunhoSalvar', (json) => {
     vendasRepo.salvarRascunho(json, agoraTimestamp());
     return true;
@@ -130,10 +130,10 @@ export function registrarIpc({ log = console } = {}) {
   });
 
   // ------------------------------ Relatórios ----------------------------
-  canal('relatorios:doDia', (data) => ({
-    resumo: relatoriosRepo.resumoDoDia(data),
-    produtos: relatoriosRepo.produtosDoDia(data),
-    formas: relatoriosRepo.porFormaPagamento(data)
+  canal('relatorios:doPeriodo', (dataInicio, dataFim) => ({
+    resumo: relatoriosRepo.resumoDoPeriodo(dataInicio, dataFim),
+    produtos: relatoriosRepo.produtosDoPeriodo(dataInicio, dataFim),
+    formas: relatoriosRepo.porFormaPagamento(dataInicio, dataFim)
   }));
   canal('relatorios:diasComVenda', (limite) => relatoriosRepo.diasComVenda(limite));
   canal('relatorios:estoqueAtual', () => relatoriosRepo.estoqueAtual());
