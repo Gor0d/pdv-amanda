@@ -40,6 +40,15 @@ contextBridge.exposeInMainWorld('pdv', {
     rascunhoLimpar: chamar('vendas:rascunhoLimpar')
   },
 
+  comandas: {
+    abrir: chamar('comandas:abrir'),
+    listarAbertas: chamar('comandas:listarAbertas'),
+    porId: chamar('comandas:porId'),
+    adicionarItem: chamar('comandas:adicionarItem'),
+    removerItem: chamar('comandas:removerItem'),
+    fechar: chamar('comandas:fechar')
+  },
+
   relatorios: {
     doPeriodo: chamar('relatorios:doPeriodo'),
     diasComVenda: chamar('relatorios:diasComVenda'),

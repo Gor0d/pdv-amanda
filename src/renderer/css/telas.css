@@ -93,6 +93,20 @@
 .chip:hover { border-color: var(--green); color: var(--green-dark); }
 .chip.ativo { background: var(--green-pale); border-color: var(--green); color: var(--green-dark); }
 
+/* ------------------------------ Comandas --------------------------------- */
+
+.comandas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.comanda-card {
+  background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 16px; cursor: pointer; transition: border-color .15s;
+}
+.comanda-card:hover { border-color: var(--green); }
+.comanda-card .identificador { font-family: var(--fonte-display); font-size: 16px; font-weight: 700; }
+.comanda-card .info { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12.5px; color: var(--ink-soft); }
+.comanda-card .total { font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600; }
+
+.comanda-modal .rline .name { max-width: 220px; }
+
 /* ------------------------------ Ajustes ---------------------------------- */
 
 .linha-info {

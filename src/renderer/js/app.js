@@ -1,12 +1,14 @@
 import { api, tentar } from './api.js';
 import { $, $$ } from './lib/dom.js';
 import * as telaVender from './telas/telaVender.js';
+import * as telaComandas from './telas/telaComandas.js';
 import * as telaEstoque from './telas/telaEstoque.js';
 import * as telaRelatorios from './telas/telaRelatorios.js';
 import * as telaAjustes from './telas/telaAjustes.js';
 
 const TELAS = {
   vender: telaVender,
+  comandas: telaComandas,
   estoque: telaEstoque,
   relatorios: telaRelatorios,
   ajustes: telaAjustes
@@ -57,6 +59,7 @@ async function iniciar() {
   $$('.tab-btn').forEach((b) => b.addEventListener('click', () => trocarAba(b.dataset.tab)));
 
   telaVender.montar({ aoFinalizar: atualizarBarraDeStatus });
+  telaComandas.montar();
   telaEstoque.montar();
   telaRelatorios.montar();
   telaAjustes.montar({ aoMudar: atualizarBarraDeStatus });

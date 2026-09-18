@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import electron from 'electron'; // ver comentário em util/caminhos.js
 import { fileURLToPath } from 'node:url';
 
-const { BrowserWindow, Menu, protocol } = electron;
+const { BrowserWindow, Menu, protocol, dialog } = electron;
 
 const RAIZ_SRC = path.dirname(fileURLToPath(import.meta.url)).replace(/[\\/]main$/, '');
 const RENDERER = path.join(RAIZ_SRC, 'renderer');
@@ -109,6 +109,32 @@ export function criarJanela({ dev = false, log = console } = {}) {
   win.once('ready-to-show', () => {
     win.maximize();
     win.show();
+  });
+
+  // Fechar sem querer (X, Alt+F4) no meio de uma venda é o pesadelo do balcão.
+  // O carrinho já fica salvo como rascunho, mas confirmar custa um clique e
+  // evita o susto.
+  let fechamentoConfirmado = false;
+  win.on('close', (evento) => {
+    if (fechamentoConfirmado) return;
+    evento.preventDefault();
+    dialog
+      .showMessageBox(win, {
+        type: 'question',
+        buttons: ['Cancelar', 'Fechar mesmo assim'],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+        title: 'Fechar o sistema?',
+        message: 'Tem certeza que deseja fechar o sistema de vendas?',
+        detail: 'Uma venda em andamento fica salva e pode ser retomada na próxima vez que abrir o programa.'
+      })
+      .then(({ response }) => {
+        if (response === 1) {
+          fechamentoConfirmado = true;
+          win.close();
+        }
+      });
   });
 
   win.loadURL('app://pdv/index.html');

@@ -8,6 +8,8 @@ import * as vendasRepo from '../repos/vendasRepo.js';
 import * as relatoriosRepo from '../repos/relatoriosRepo.js';
 import * as configRepo from '../repos/configRepo.js';
 import * as vendaServico from '../servicos/vendaServico.js';
+import * as comandasRepo from '../repos/comandasRepo.js';
+import * as comandaServico from '../servicos/comandaServico.js';
 import { importar } from '../servicos/importacaoServico.js';
 import { backupAgora, ultimoBackup } from '../servicos/backupServico.js';
 import { obterBanco } from '../db/conexao.js';
@@ -128,6 +130,42 @@ export function registrarIpc({ log = console } = {}) {
     vendasRepo.limparRascunho();
     return true;
   });
+
+  // ------------------------------ Comandas ------------------------------
+  canal('comandas:abrir', ({ identificador, operador, observacoes } = {}) => {
+    if (!identificador || !String(identificador).trim()) {
+      throw new ErroNegocio(CODIGOS.DADOS_INVALIDOS, 'Informe a mesa ou o nome do cliente.');
+    }
+    return comandasRepo.abrir({ identificador, operador, observacoes });
+  });
+  canal('comandas:listarAbertas', () => comandasRepo.listarAbertas());
+  canal('comandas:porId', (id) => comandasRepo.porId(id));
+
+  canal('comandas:adicionarItem', (comandaId, { produtoId, qtdMilesimal }) => {
+    const comanda = comandasRepo.porId(comandaId);
+    if (!comanda) throw new ErroNegocio(CODIGOS.COMANDA_NAO_ENCONTRADA, 'Comanda não encontrada.');
+    if (comanda.status === 'fechada') {
+      throw new ErroNegocio(CODIGOS.COMANDA_JA_FECHADA, 'Essa comanda já foi fechada.');
+    }
+    const p = produtosRepo.porId(produtoId);
+    if (!p) throw new ErroNegocio(CODIGOS.PRODUTO_NAO_ENCONTRADO, 'Produto não encontrado.');
+    if (!(qtdMilesimal > 0)) {
+      throw new ErroNegocio(CODIGOS.DADOS_INVALIDOS, 'Informe uma quantidade maior que zero.');
+    }
+    return comandasRepo.adicionarItem(comandaId, {
+      produtoId: p.id,
+      descricao: p.nome,
+      precoUnitCentavos: p.preco_centavos,
+      qtdMilesimal
+    });
+  });
+
+  canal('comandas:removerItem', (itemId) => {
+    comandasRepo.removerItem(itemId);
+    return true;
+  });
+
+  canal('comandas:fechar', (comandaId, entrada) => comandaServico.fechar(comandaId, entrada, { log }));
 
   // ------------------------------ Relatórios ----------------------------
   canal('relatorios:doPeriodo', (dataInicio, dataFim) => ({

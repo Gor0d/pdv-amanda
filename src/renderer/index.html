@@ -19,6 +19,7 @@
   </h1>
   <nav>
     <button class="tab-btn active" data-tab="vender">Vender</button>
+    <button class="tab-btn" data-tab="comandas">Comandas</button>
     <button class="tab-btn" data-tab="estoque">Estoque</button>
     <button class="tab-btn" data-tab="relatorios">Relatórios</button>
     <button class="tab-btn" data-tab="ajustes">Ajustes</button>
@@ -84,6 +85,24 @@
           Por enquanto toda venda é registrada como <b>dinheiro</b>.
         </p>
       </div>
+    </div>
+  </section>
+
+  <!-- ============================== COMANDAS ============================= -->
+  <section id="tab-comandas" class="tab">
+    <div class="card">
+      <h2>Abrir comanda</h2>
+      <div class="scan-row">
+        <input id="cm-identificador" type="text" autocomplete="off"
+               placeholder="Mesa 4, João, Balcão...">
+        <button class="btn btn-primary btn-compacto" data-acao="abrir-comanda">Abrir</button>
+      </div>
+      <div id="cm-msg" class="msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>Comandas em aberto</h2>
+      <div id="cm-lista" class="comandas-grid"></div>
     </div>
   </section>
 
