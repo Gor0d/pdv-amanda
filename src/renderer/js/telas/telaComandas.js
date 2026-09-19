@@ -1,5 +1,6 @@
 import { api, tentar } from '../api.js';
-import { $, escapar, aoClicar, mostrarMsg, toast, confirmar, abrirModal, fecharModal } from '../lib/dom.js';
+import { $, escapar, aoClicar, mostrarMsg, toast, abrirModal, fecharModal } from '../lib/dom.js';
+import { escolherPagamento } from '../lib/pagamento.js';
 import { formatarBRL, formatarQtd, paraMilesimal } from '/compartilhado/formato/moeda.js';
 import { formatarDataHoraBR } from '/compartilhado/formato/data.js';
 
@@ -258,19 +259,20 @@ async function fecharComanda(caixa) {
     (soma, i) => soma + Math.round((i.preco_unit_centavos * i.qtd_milesimal) / 1000), 0
   );
 
-  // confirmar() usa o mesmo #modal global da tela de itens — ao responder,
-  // o conteúdo anterior já foi substituído. Se a pessoa recuar, reabrimos a
-  // comanda do zero em vez de deixar o modal vazio.
-  const ok = await confirmar({
-    titulo: `Fechar "${rotuloComanda(comanda)}"?`,
-    texto: `Total da comanda: ${formatarBRL(total)}. Isso registra a venda e baixa o estoque dos itens. ` +
-           'Por enquanto todo fechamento é registrado como recebido em dinheiro.',
-    confirmar: 'Fechar e cobrar'
-  });
-  if (!ok) { abrirDetalhe(comandaAtualId); return; }
+  // escolherPagamento() usa o mesmo #modal global da tela de itens — ao
+  // responder, o conteúdo anterior já foi substituído. Se a pessoa recuar,
+  // reabrimos a comanda do zero em vez de deixar o modal vazio.
+  const pagamento = await escolherPagamento(total);
+  if (!pagamento) { abrirDetalhe(comandaAtualId); return; }
 
   const r = await tentar(
-    () => api.comandas.fechar(comandaAtualId, { pagamentos: [{ forma: 'dinheiro', valorCentavos: total }] }),
+    () => api.comandas.fechar(comandaAtualId, {
+      pagamentos: [{
+        forma: pagamento.forma,
+        valorCentavos: pagamento.valorCentavos,
+        recebidoCentavos: pagamento.recebidoCentavos
+      }]
+    }),
     { aoFalhar: (e) => toast(e.message, 'err') }
   );
   if (r === undefined) return;

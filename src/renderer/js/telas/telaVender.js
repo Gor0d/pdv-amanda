@@ -1,5 +1,6 @@
 import { api, tentar, ErroApi } from '../api.js';
 import { $, escapar, aoClicar, mostrarMsg, toast, abrirModal, fecharModal, modalAberto, confirmar } from '../lib/dom.js';
+import { escolherPagamento } from '../lib/pagamento.js';
 import { formatarBRL, formatarQtd, paraMilesimal } from '/compartilhado/formato/moeda.js';
 import { calcularTotais } from '/compartilhado/calculos/totais.js';
 import { formatarDataBR, hojeISO, agoraHora } from '/compartilhado/formato/data.js';
@@ -372,6 +373,9 @@ async function finalizar() {
   if (!carrinho.length) return;
 
   const totais = calcularTotais(carrinho);
+  const pagamento = await escolherPagamento(totais.totalCentavos);
+  if (!pagamento) { focarScan(); return; }
+
   const r = await tentar(() => api.vendas.finalizar({
     itens: carrinho.map((i) => ({
       produtoId: i.produtoId,
@@ -379,16 +383,21 @@ async function finalizar() {
       precoUnitCentavos: i.precoUnitCentavos,
       qtdMilesimal: i.qtdMilesimal
     })),
-    // Nesta fase toda venda é dinheiro pelo valor exato. Formas de pagamento,
-    // split e troco entram na fase 3, sem mexer nesta chamada.
-    pagamentos: [{ forma: 'dinheiro', valorCentavos: totais.totalCentavos }],
+    // Por ora uma forma só por venda, sem split — cobre o pedido de escolher
+    // entre dinheiro/pix/débito/crédito sem entrar em pagamento misto ainda.
+    pagamentos: [{
+      forma: pagamento.forma,
+      valorCentavos: pagamento.valorCentavos,
+      recebidoCentavos: pagamento.recebidoCentavos
+    }],
     totalEsperadoCentavos: totais.totalCentavos
   }));
 
   if (r === undefined) return;
 
   limpar();
-  toast(`Venda ${String(r.numero).padStart(6, '0')} registrada — ${formatarBRL(r.totais.totalCentavos)}`);
+  const troco = r.trocoCentavos ? ` (troco ${formatarBRL(r.trocoCentavos)})` : '';
+  toast(`Venda ${String(r.numero).padStart(6, '0')} registrada — ${formatarBRL(r.totais.totalCentavos)}${troco}`);
   aoFinalizarCallback?.(r);
 }
 

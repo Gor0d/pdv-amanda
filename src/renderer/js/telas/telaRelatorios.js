@@ -107,6 +107,12 @@ function desenharProdutos(produtos, formas, resumo) {
   `;
 }
 
+/** "Balcão" pra venda avulsa, ou "Mesa 4 · João" quando veio do fechamento de uma comanda. */
+function origemVenda(v) {
+  if (!v.comanda_identificador) return 'Balcão';
+  return v.comanda_cliente_nome ? `${v.comanda_identificador} · ${v.comanda_cliente_nome}` : v.comanda_identificador;
+}
+
 function desenharVendas(vendas, mostrarData) {
   const el = $('#rel-lista-vendas');
   if (!vendas.length) {
@@ -118,6 +124,7 @@ function desenharVendas(vendas, mostrarData) {
       <thead>
         <tr>
           <th>Nº</th>${mostrarData ? '<th>Data</th>' : ''}<th>Hora</th>
+          <th>Origem</th><th>Forma</th>
           <th class="num">Itens</th><th class="num">Total</th><th>Situação</th><th></th>
         </tr>
       </thead>
@@ -127,6 +134,8 @@ function desenharVendas(vendas, mostrarData) {
             <td class="mono">${String(v.numero).padStart(6, '0')}</td>
             ${mostrarData ? `<td class="mono">${formatarDataBR(v.data)}</td>` : ''}
             <td class="mono">${escapar(v.hora)}</td>
+            <td>${escapar(origemVenda(v))}</td>
+            <td>${(v.formas || '').split(',').filter(Boolean).map((f) => NOME_FORMA[f] ?? f).join(', ') || '—'}</td>
             <td class="num">${v.qtd_itens}</td>
             <td class="num">${formatarBRL(v.total_centavos)}</td>
             <td>${v.status === 'cancelada'
@@ -175,6 +184,7 @@ async function verVenda(id) {
   abrirModal(`
     <h3>Venda ${String(v.numero).padStart(6, '0')}</h3>
     <div class="sub">${formatarDataBR(v.data)} às ${escapar(v.hora)}
+      ${v.comanda ? ` · Comanda: ${escapar(v.comanda.identificador)}${v.comanda.cliente_nome ? ' · ' + escapar(v.comanda.cliente_nome) : ''}` : ''}
       ${v.status === 'cancelada' ? ' · <span class="txt-perigo">CANCELADA</span>' : ''}</div>
     <div class="receipt sem-moldura">
       ${v.itens.map((i) => `

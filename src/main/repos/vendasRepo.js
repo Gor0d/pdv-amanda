@@ -59,6 +59,9 @@ export function porId(id) {
   if (venda.cliente_id) {
     venda.cliente = db.prepare('SELECT id, nome, cpf_cnpj, telefone FROM clientes WHERE id = ?').get(venda.cliente_id);
   }
+  venda.comanda = db
+    .prepare('SELECT identificador, cliente_nome FROM comandas WHERE venda_id = ?')
+    .get(id) || null;
   return venda;
 }
 
@@ -73,9 +76,12 @@ export function listarDoPeriodo(dataInicio, dataFim = dataInicio) {
     .prepare(
       `SELECT v.id, v.numero, v.data, v.hora, v.status, v.total_centavos, v.operador,
               c.nome AS cliente_nome,
+              cm.identificador AS comanda_identificador, cm.cliente_nome AS comanda_cliente_nome,
               (SELECT group_concat(DISTINCT forma) FROM pagamentos WHERE venda_id = v.id) AS formas,
               (SELECT count(*) FROM venda_itens WHERE venda_id = v.id) AS qtd_itens
-         FROM vendas v LEFT JOIN clientes c ON c.id = v.cliente_id
+         FROM vendas v
+         LEFT JOIN clientes c ON c.id = v.cliente_id
+         LEFT JOIN comandas cm ON cm.venda_id = v.id
         WHERE v.data BETWEEN ? AND ?
         ORDER BY v.data DESC, v.numero DESC`
     )

@@ -237,6 +237,7 @@ tr.inativo td { opacity: .5; }
 .grid-2       { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .grid-campos  { display: grid; gap: 12px; }
 .clicavel     { cursor: pointer; }
+.oculto       { display: none; }
 
 .txt-perigo   { color: var(--rust); }
 .txt-ok       { color: var(--green-dark); }
