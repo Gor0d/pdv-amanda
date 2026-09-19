@@ -64,6 +64,8 @@ contextBridge.exposeInMainWorld('pdv', {
     info: chamar('sistema:info'),
     importarArquivo: chamar('sistema:importarArquivo'),
     backupAgora: chamar('sistema:backupAgora'),
-    abrirPasta: chamar('sistema:abrirPasta')
+    abrirPasta: chamar('sistema:abrirPasta'),
+    escolherPastaBackup: chamar('sistema:escolherPastaBackup'),
+    usarPastaBackupAutomatica: chamar('sistema:usarPastaBackupAutomatica')
   }
 });

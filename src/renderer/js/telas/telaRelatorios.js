@@ -50,6 +50,10 @@ export async function renderizar() {
   $('#rel-total').textContent = formatarBRL(resumo.total_centavos);
   $('#rel-itens').textContent = formatarQtd(resumo.itens_milesimal);
   $('#rel-vendas').textContent = resumo.qtd_vendas;
+  $('#rel-lucro').textContent = formatarBRL(resumo.lucro_centavos);
+  $('#rel-lucro-msg').textContent = resumo.itens_sem_custo
+    ? `Não conta ${resumo.itens_sem_custo} item(ns) vendido(s) sem custo cadastrado no produto.`
+    : '';
 
   desenharChips(dias || [], dataInicio, dataFim);
   desenharProdutos(produtos, formas, resumo);
@@ -92,13 +96,14 @@ function desenharProdutos(produtos, formas, resumo) {
 
   el.innerHTML = `
     <table>
-      <thead><tr><th>Produto</th><th class="num">Qtd. vendida</th><th class="num">Total</th></tr></thead>
+      <thead><tr><th>Produto</th><th class="num">Qtd. vendida</th><th class="num">Total</th><th class="num">Lucro</th></tr></thead>
       <tbody>
         ${produtos.map((p) => `
           <tr>
             <td>${escapar(p.descricao)}</td>
             <td class="num">${formatarQtd(p.qtd_milesimal)}</td>
             <td class="num">${formatarBRL(p.total_centavos)}</td>
+            <td class="num">${p.lucro_centavos != null ? formatarBRL(p.lucro_centavos) : '—'}</td>
           </tr>`).join('')}
       </tbody>
     </table>

@@ -172,7 +172,9 @@
         <div class="stat"><div class="label">Total vendido</div><div class="value" id="rel-total">R$ 0,00</div></div>
         <div class="stat"><div class="label">Itens vendidos</div><div class="value" id="rel-itens">0</div></div>
         <div class="stat"><div class="label">Vendas realizadas</div><div class="value" id="rel-vendas">0</div></div>
+        <div class="stat"><div class="label">Lucro estimado</div><div class="value" id="rel-lucro">R$ 0,00</div></div>
       </div>
+      <div id="rel-lucro-msg" class="txt-suave esp-topo-p"></div>
     </div>
 
     <div class="card">
@@ -229,6 +231,10 @@
         <button class="btn btn-primary btn-compacto" data-acao="backup">Fazer backup agora</button>
         <button class="btn btn-ghost btn-compacto" data-acao="abrir-pasta">Abrir pasta de backups</button>
         <button class="btn btn-ghost btn-compacto" data-acao="recalcular">Conferir estoque</button>
+      </div>
+      <div class="btn-row" id="pasta-backup-acoes">
+        <button class="btn btn-ghost btn-compacto" data-acao="escolher-pasta-backup">Escolher outra pasta...</button>
+        <button class="btn btn-ghost btn-compacto oculto" data-acao="pasta-backup-automatica">Usar automático (nuvem/Documentos)</button>
       </div>
       <div id="sys-msg" class="msg"></div>
       <div id="sys-info" class="esp-topo"></div>

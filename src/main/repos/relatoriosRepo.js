@@ -20,11 +20,25 @@ export function resumoDoPeriodo(dataInicio, dataFim) {
               coalesce((SELECT SUM(total_centavos) FROM vendas
                          WHERE data BETWEEN ? AND ? AND status = 'cancelada'), 0) AS cancelado_centavos,
               coalesce((SELECT count(*) FROM vendas
-                         WHERE data BETWEEN ? AND ? AND status = 'cancelada'), 0) AS qtd_canceladas
+                         WHERE data BETWEEN ? AND ? AND status = 'cancelada'), 0) AS qtd_canceladas,
+              -- Lucro só soma o que tem custo cadastrado no item (snapshot do
+              -- cadastro no momento da venda) — item sem custo não entra na
+              -- conta, pra não fingir que o lucro é maior do que se sabe.
+              coalesce((SELECT SUM(i.total_item_centavos - (i.custo_unit_centavos * i.qtd_milesimal) / 1000)
+                          FROM venda_itens i JOIN vendas v3 ON v3.id = i.venda_id
+                         WHERE v3.data BETWEEN ? AND ? AND v3.status = 'finalizada'
+                           AND i.custo_unit_centavos IS NOT NULL), 0) AS lucro_centavos,
+              coalesce((SELECT count(*)
+                          FROM venda_itens i JOIN vendas v4 ON v4.id = i.venda_id
+                         WHERE v4.data BETWEEN ? AND ? AND v4.status = 'finalizada'
+                           AND i.custo_unit_centavos IS NULL), 0) AS itens_sem_custo
          FROM vendas
         WHERE data BETWEEN ? AND ? AND status = 'finalizada'`
     )
-    .get(dataInicio, dataFim, dataInicio, dataFim, dataInicio, dataFim, dataInicio, dataFim);
+    .get(
+      dataInicio, dataFim, dataInicio, dataFim, dataInicio, dataFim,
+      dataInicio, dataFim, dataInicio, dataFim, dataInicio, dataFim
+    );
 }
 
 export function produtosDoPeriodo(dataInicio, dataFim) {
@@ -32,7 +46,12 @@ export function produtosDoPeriodo(dataInicio, dataFim) {
     .prepare(
       `SELECT i.descricao, i.codigo_barras,
               SUM(i.qtd_milesimal)        AS qtd_milesimal,
-              SUM(i.total_item_centavos)  AS total_centavos
+              SUM(i.total_item_centavos)  AS total_centavos,
+              -- NULL quando algum lançamento do grupo não tem custo — melhor
+              -- mostrar "sem info" do que um lucro por produto incompleto.
+              CASE WHEN SUM(CASE WHEN i.custo_unit_centavos IS NULL THEN 1 ELSE 0 END) = 0
+                   THEN SUM(i.total_item_centavos - (i.custo_unit_centavos * i.qtd_milesimal) / 1000)
+                   ELSE NULL END AS lucro_centavos
          FROM venda_itens i JOIN vendas v ON v.id = i.venda_id
         WHERE v.data BETWEEN ? AND ? AND v.status = 'finalizada'
         GROUP BY coalesce(i.produto_id, i.descricao), i.descricao, i.codigo_barras

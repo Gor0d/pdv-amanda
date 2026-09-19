@@ -20,6 +20,8 @@ export function montar({ aoMudar } = {}) {
     if (acao === 'backup') backup();
     if (acao === 'abrir-pasta') api.sistema.abrirPasta('pdv').catch(() => {});
     if (acao === 'recalcular') recalcular();
+    if (acao === 'escolher-pasta-backup') escolherPastaBackup();
+    if (acao === 'pasta-backup-automatica') usarPastaBackupAutomatica();
   });
 }
 
@@ -80,6 +82,23 @@ async function backup() {
   aoMudarConfig?.();
 }
 
+async function escolherPastaBackup() {
+  const novaPasta = await tentar(() => api.sistema.escolherPastaBackup(),
+    { aoFalhar: (e) => mostrarMsg('#sys-msg', e.message, 'err') });
+  if (novaPasta === undefined) return;
+  if (novaPasta === null) return; // fechou o seletor sem escolher
+  mostrarMsg('#sys-msg', `A partir de agora os backups vão para: ${novaPasta}`, 'ok', 8);
+  await mostrarInfo();
+}
+
+async function usarPastaBackupAutomatica() {
+  const pasta = await tentar(() => api.sistema.usarPastaBackupAutomatica(),
+    { aoFalhar: (e) => mostrarMsg('#sys-msg', e.message, 'err') });
+  if (pasta === undefined) return;
+  mostrarMsg('#sys-msg', `Voltou ao automático (nuvem/Documentos): ${pasta}`, 'ok', 8);
+  await mostrarInfo();
+}
+
 async function recalcular() {
   const divergentes = await tentar(() => api.estoque.recalcularCache());
   if (divergentes === undefined) return;
@@ -100,13 +119,20 @@ async function recalcular() {
 async function mostrarInfo() {
   const info = await tentar(() => api.sistema.info(), { aoFalhar: () => {} });
   if (!info) return;
+
+  const personalizada = !!info.pastaBackupPersonalizada;
   $('#sys-info').innerHTML = `
     <div class="linha-info"><span class="rotulo">Versão do sistema</span><span class="valor">${escapar(info.versaoApp)}</span></div>
     <div class="linha-info"><span class="rotulo">Versão do banco de dados</span><span class="valor">${info.versaoEsquema}</span></div>
     <div class="linha-info"><span class="rotulo">Arquivo de dados</span><span class="valor">${escapar(info.caminhoBanco)}</span></div>
-    <div class="linha-info"><span class="rotulo">Pasta de backups</span><span class="valor">${escapar(info.pastaPdv)}</span></div>
+    <div class="linha-info">
+      <span class="rotulo">Pasta de backups</span>
+      <span class="valor">${escapar(info.pastaBackups)} ${personalizada ? '(escolhida por você)' : '(automática — nuvem/Documentos)'}</span>
+    </div>
     <div class="linha-info"><span class="rotulo">Último backup</span><span class="valor">${
       info.ultimoBackup ? escapar(new Date(info.ultimoBackup.em).toLocaleString('pt-BR')) : 'nenhum ainda'
     }</span></div>
   `;
+
+  $('[data-acao="pasta-backup-automatica"]').classList.toggle('oculto', !personalizada);
 }

@@ -75,7 +75,7 @@
 
 /* ------------------------------ Relatórios ------------------------------- */
 
-.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .stat { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
 .stat .label { font-size: 11.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--ink-soft); }
 .stat .value {

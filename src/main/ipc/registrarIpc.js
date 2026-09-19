@@ -13,7 +13,9 @@ import * as comandaServico from '../servicos/comandaServico.js';
 import { importar } from '../servicos/importacaoServico.js';
 import { backupAgora, ultimoBackup } from '../servicos/backupServico.js';
 import { obterBanco } from '../db/conexao.js';
-import { caminhoBanco, pastaPdv } from '../util/caminhos.js';
+import {
+  caminhoBanco, pastaPdv, pastaBackups, pastaBackupPersonalizada, definirPastaBackupPersonalizada
+} from '../util/caminhos.js';
 import { ErroNegocio, CODIGOS, paraResposta } from '../util/erros.js';
 import { agoraTimestamp } from '../../compartilhado/formato/data.js';
 
@@ -190,8 +192,25 @@ export function registrarIpc({ log = console } = {}) {
     versaoEsquema: obterBanco().pragma('user_version', { simple: true }),
     caminhoBanco: caminhoBanco(),
     pastaPdv: pastaPdv(),
+    pastaBackups: pastaBackups(),
+    pastaBackupPersonalizada: pastaBackupPersonalizada(),
     ultimoBackup: ultimoBackup()
   }));
+
+  canal('sistema:escolherPastaBackup', async () => {
+    const r = await dialog.showOpenDialog({
+      title: 'Escolha a pasta onde salvar os backups (fora da nuvem, se preferir)',
+      properties: ['openDirectory', 'createDirectory']
+    });
+    if (r.canceled || !r.filePaths[0]) return null;
+    definirPastaBackupPersonalizada(r.filePaths[0]);
+    return pastaBackups();
+  });
+
+  canal('sistema:usarPastaBackupAutomatica', () => {
+    definirPastaBackupPersonalizada(null);
+    return pastaBackups();
+  });
 
   canal('sistema:importarArquivo', async () => {
     const r = await dialog.showOpenDialog({
@@ -207,7 +226,7 @@ export function registrarIpc({ log = console } = {}) {
   canal('sistema:backupAgora', () => backupAgora({ log }));
 
   canal('sistema:abrirPasta', (qual) => {
-    shell.openPath(qual === 'banco' ? app.getPath('userData') : pastaPdv());
+    shell.openPath(qual === 'banco' ? app.getPath('userData') : pastaBackups());
     return true;
   });
 }
