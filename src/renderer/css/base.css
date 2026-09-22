@@ -240,6 +240,11 @@ tr.inativo td { opacity: .5; }
 .clicavel     { cursor: pointer; }
 .oculto       { display: none; }
 
+/* Botão "Cancelar edição" do cadastro: só aparece quando editar() liga o
+   display inline pra 'flex'. Escondido por padrão aqui, não com .oculto,
+   porque o JS troca style.display direto (ver telaEstoque/telaFornecedores). */
+#p-acoes-edicao, #f-acoes-edicao { display: none; }
+
 .txt-perigo   { color: var(--rust); }
 .txt-ok       { color: var(--green-dark); }
 .txt-suave    { color: var(--ink-soft); font-size: 12.5px; }
