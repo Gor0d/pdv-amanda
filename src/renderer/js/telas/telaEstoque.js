@@ -22,11 +22,82 @@ export function montar() {
 
   // Enter em qualquer campo do formulário salva — o cadastro é feito no
   // teclado, entre uma venda e outra.
-  for (const campo of ['#p-codigo', '#p-nome', '#p-custo', '#p-preco', '#p-estoque']) {
+  for (const campo of ['#p-codigo', '#p-nome', '#p-custo', '#p-margem', '#p-lucro', '#p-preco', '#p-estoque']) {
     $(campo).addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); salvar(); }
     });
   }
+
+  instalarCalculoPreco();
+}
+
+// --------------------------- Calculadora de preço -------------------------
+//
+// Preço de compra, Margem (%), Lucro (R$) e Preço de venda formam um
+// triângulo: fixado o custo, qualquer um dos outros três recalcula os outros
+// dois. Markup sobre o custo (lucro = custo × margem/100), igual ao sistema
+// que a loja usava antes — não é margem sobre o preço de venda.
+//
+// Cada handler ESCREVE nos outros campos via .value (nunca dispara 'input'
+// neles), então não há risco de loop entre os três.
+
+function paraPercentual(texto) {
+  const limpo = String(texto ?? '').trim().replace(',', '.');
+  if (limpo === '') return null;
+  const n = parseFloat(limpo);
+  return Number.isFinite(n) ? n : null;
+}
+
+function preencherCentavos(input, centavos) {
+  input.value = (centavos / 100).toFixed(2).replace('.', ',');
+}
+
+function preencherPercentual(input, pct) {
+  input.value = pct.toFixed(2).replace('.', ',');
+}
+
+function instalarCalculoPreco() {
+  const custo = $('#p-custo');
+  const margem = $('#p-margem');
+  const lucro = $('#p-lucro');
+  const preco = $('#p-preco');
+
+  const custoAtual = () => paraCentavos(custo.value) ?? 0;
+
+  const aPartirDaMargem = () => {
+    const pct = paraPercentual(margem.value);
+    if (pct === null) return;
+    const l = Math.round((custoAtual() * pct) / 100);
+    preencherCentavos(lucro, l);
+    preencherCentavos(preco, custoAtual() + l);
+  };
+
+  const aPartirDoLucro = () => {
+    const l = paraCentavos(lucro.value);
+    if (l === null) return;
+    preencherCentavos(preco, custoAtual() + l);
+    const c = custoAtual();
+    if (c > 0) preencherPercentual(margem, (l / c) * 100);
+  };
+
+  const aPartirDoPreco = () => {
+    const p = paraCentavos(preco.value);
+    if (p === null) return;
+    const l = p - custoAtual();
+    preencherCentavos(lucro, l);
+    const c = custoAtual();
+    if (c > 0) preencherPercentual(margem, (l / c) * 100);
+  };
+
+  custo.addEventListener('input', () => {
+    // Custo mudou: se já existe uma margem definida, ela manda; senão
+    // recalcula a partir do preço de venda já digitado.
+    if (margem.value.trim()) aPartirDaMargem();
+    else if (preco.value.trim()) aPartirDoPreco();
+  });
+  margem.addEventListener('input', aPartirDaMargem);
+  lucro.addEventListener('input', aPartirDoLucro);
+  preco.addEventListener('input', aPartirDoPreco);
 }
 
 export async function aoEntrar() {
@@ -109,6 +180,14 @@ async function editar(id) {
   $('#p-nome').value = p.nome;
   $('#p-custo').value = p.custo_centavos != null ? (p.custo_centavos / 100).toFixed(2).replace('.', ',') : '';
   $('#p-preco').value = (p.preco_centavos / 100).toFixed(2).replace('.', ',');
+  if (p.custo_centavos != null && p.custo_centavos > 0) {
+    const lucroCentavos = p.preco_centavos - p.custo_centavos;
+    $('#p-lucro').value = (lucroCentavos / 100).toFixed(2).replace('.', ',');
+    $('#p-margem').value = ((lucroCentavos / p.custo_centavos) * 100).toFixed(2).replace('.', ',');
+  } else {
+    $('#p-lucro').value = '';
+    $('#p-margem').value = '';
+  }
   $('#p-estoque').value = formatarQtd(p.estoque_milesimal);
   $('#form-titulo').textContent = `Editando: ${p.nome}`;
   $('#p-acoes-edicao').style.display = 'flex';
@@ -119,7 +198,7 @@ async function editar(id) {
 
 function limparFormulario() {
   editandoId = null;
-  for (const c of ['#p-codigo', '#p-nome', '#p-custo', '#p-preco', '#p-estoque']) $(c).value = '';
+  for (const c of ['#p-codigo', '#p-nome', '#p-custo', '#p-margem', '#p-lucro', '#p-preco', '#p-estoque']) $(c).value = '';
   $('#form-titulo').textContent = 'Cadastrar produto';
   $('#p-acoes-edicao').style.display = 'none';
   esconderMsg('#p-msg');
@@ -176,10 +255,10 @@ function abrirEntrada(id, nome) {
   });
 }
 
-/** Margem sobre o preço de venda: (preço - custo) / preço. Sem custo cadastrado, não dá pra calcular. */
+/** Markup sobre o custo: (preço - custo) / custo. Mesma conta do formulário de cadastro. */
 function calcularMargem(custoCentavos, precoCentavos) {
-  if (custoCentavos == null || !precoCentavos) return '—';
-  const margem = ((precoCentavos - custoCentavos) / precoCentavos) * 100;
+  if (custoCentavos == null || !custoCentavos) return '—';
+  const margem = ((precoCentavos - custoCentavos) / custoCentavos) * 100;
   return `${margem.toFixed(1).replace('.', ',')}%`;
 }
 

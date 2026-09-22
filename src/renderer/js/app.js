@@ -3,6 +3,7 @@ import { $, $$ } from './lib/dom.js';
 import * as telaVender from './telas/telaVender.js';
 import * as telaComandas from './telas/telaComandas.js';
 import * as telaEstoque from './telas/telaEstoque.js';
+import * as telaFornecedores from './telas/telaFornecedores.js';
 import * as telaRelatorios from './telas/telaRelatorios.js';
 import * as telaAjustes from './telas/telaAjustes.js';
 
@@ -10,6 +11,7 @@ const TELAS = {
   vender: telaVender,
   comandas: telaComandas,
   estoque: telaEstoque,
+  fornecedores: telaFornecedores,
   relatorios: telaRelatorios,
   ajustes: telaAjustes
 };
@@ -61,6 +63,7 @@ async function iniciar() {
   telaVender.montar({ aoFinalizar: atualizarBarraDeStatus });
   telaComandas.montar();
   telaEstoque.montar();
+  telaFornecedores.montar();
   telaRelatorios.montar();
   telaAjustes.montar({ aoMudar: atualizarBarraDeStatus });
 

@@ -191,7 +191,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); }
 input[type=number] { font-family: var(--fonte-mono); }
 
 .form-grid { display: grid; gap: 10px; align-items: end; }
-.form-grid.produto { grid-template-columns: 1.2fr 2fr 1fr 1fr 1fr auto; }
+.form-grid.produto-precos { grid-template-columns: repeat(5, 1fr); }
+.form-grid.fornecedor { grid-template-columns: 2fr 1fr 1fr 1.4fr; }
 
 table { width: 100%; border-collapse: collapse; margin-top: 4px; }
 th {
@@ -275,7 +276,8 @@ tr.inativo td { opacity: .5; }
 .receipt.sem-moldura { border: none; padding: 0; }
 
 @media (max-width: 720px) {
-  .form-grid.produto { grid-template-columns: 1fr 1fr; }
+  .form-grid.produto-precos { grid-template-columns: 1fr 1fr; }
+  .form-grid.fornecedor { grid-template-columns: 1fr 1fr; }
   .grid-2 { grid-template-columns: 1fr; }
   main { padding: 16px 12px 60px 12px; }
 }

@@ -23,6 +23,14 @@ contextBridge.exposeInMainWorld('pdv', {
     removerCodigo: chamar('produtos:removerCodigo')
   },
 
+  fornecedores: {
+    listar: chamar('fornecedores:listar'),
+    porId: chamar('fornecedores:porId'),
+    criar: chamar('fornecedores:criar'),
+    atualizar: chamar('fornecedores:atualizar'),
+    inativar: chamar('fornecedores:inativar')
+  },
+
   estoque: {
     entrada: chamar('estoque:entrada'),
     ajustar: chamar('estoque:ajustar'),

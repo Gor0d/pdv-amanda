@@ -10,6 +10,7 @@ import * as configRepo from '../repos/configRepo.js';
 import * as vendaServico from '../servicos/vendaServico.js';
 import * as comandasRepo from '../repos/comandasRepo.js';
 import * as comandaServico from '../servicos/comandaServico.js';
+import * as fornecedoresRepo from '../repos/fornecedoresRepo.js';
 import { importar } from '../servicos/importacaoServico.js';
 import { backupAgora, ultimoBackup } from '../servicos/backupServico.js';
 import { obterBanco } from '../db/conexao.js';
@@ -89,6 +90,29 @@ export function registrarIpc({ log = console } = {}) {
 
   canal('produtos:removerCodigo', (codigoId) => {
     produtosRepo.removerCodigo(codigoId);
+    return true;
+  });
+
+  // ----------------------------- Fornecedores ----------------------------
+  canal('fornecedores:listar', (filtro) => fornecedoresRepo.listar(filtro || {}));
+  canal('fornecedores:porId', (id) => fornecedoresRepo.porId(id));
+
+  canal('fornecedores:criar', (dados) => {
+    validarFornecedor(dados);
+    return fornecedoresRepo.criar(dados);
+  });
+
+  canal('fornecedores:atualizar', (id, dados) => {
+    validarFornecedor(dados);
+    if (!fornecedoresRepo.porId(id)) {
+      throw new ErroNegocio(CODIGOS.FORNECEDOR_NAO_ENCONTRADO, 'Fornecedor não encontrado.');
+    }
+    fornecedoresRepo.atualizar(id, dados);
+    return true;
+  });
+
+  canal('fornecedores:inativar', (id) => {
+    fornecedoresRepo.inativar(id);
     return true;
   });
 
@@ -237,5 +261,11 @@ function validarProduto(d) {
   }
   if (!Number.isInteger(d.precoCentavos) || d.precoCentavos < 0) {
     throw new ErroNegocio(CODIGOS.DADOS_INVALIDOS, 'Informe um preço válido.');
+  }
+}
+
+function validarFornecedor(d) {
+  if (!d?.nome || !String(d.nome).trim()) {
+    throw new ErroNegocio(CODIGOS.DADOS_INVALIDOS, 'Informe o nome do fornecedor.');
   }
 }
