@@ -95,3 +95,22 @@ export function estoqueAtual() {
     )
     .all();
 }
+
+/**
+ * Produtos com estoque > 0 e validade até dataLimite (ISO), do mais urgente
+ * pro menos. Inclui os já vencidos (validade < hoje) — não faz sentido
+ * esconder da loja o que já estragou e ainda está na prateleira.
+ */
+export function produtosAVencer(dataLimite) {
+  return obterBanco()
+    .prepare(
+      `SELECT p.id, p.nome, p.unidade, p.validade, p.estoque_milesimal,
+              (SELECT codigo FROM produto_codigos WHERE produto_id = p.id
+                ORDER BY principal DESC, id LIMIT 1) AS codigo
+         FROM produtos p
+        WHERE p.ativo = 1 AND p.controla_estoque = 1 AND p.estoque_milesimal > 0
+          AND p.validade IS NOT NULL AND p.validade <= ?
+        ORDER BY p.validade`
+    )
+    .all(dataLimite);
+}

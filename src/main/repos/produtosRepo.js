@@ -4,7 +4,7 @@ import { variacoesCodigo, ehEanValido } from '../../compartilhado/calculos/ean.j
 
 const CAMPOS = `p.id, p.sku, p.nome, p.descricao, p.unidade, p.preco_centavos,
                 p.custo_centavos, p.estoque_milesimal, p.estoque_minimo_milesimal,
-                p.controla_estoque, p.ativo, p.origem`;
+                p.controla_estoque, p.ativo, p.origem, p.validade, p.fornecedor_id`;
 
 export function porId(id) {
   return obterBanco().prepare(`SELECT ${CAMPOS} FROM produtos p WHERE p.id = ?`).get(id) || null;
@@ -55,8 +55,10 @@ export function listar({ termo = '', apenasAtivos = true, limite = 200 } = {}) {
     .prepare(
       `SELECT ${CAMPOS},
               (SELECT codigo FROM produto_codigos WHERE produto_id = p.id
-                ORDER BY principal DESC, id LIMIT 1) AS codigo
+                ORDER BY principal DESC, id LIMIT 1) AS codigo,
+              f.nome AS fornecedor_nome
          FROM produtos p
+         LEFT JOIN fornecedores f ON f.id = p.fornecedor_id
         WHERE (? = 0 OR p.ativo = 1)
           AND (? = ''
                OR lower(p.nome) LIKE ?
@@ -77,9 +79,10 @@ export function criar(dados) {
       .prepare(
         `INSERT INTO produtos (sku, nome, descricao, unidade, preco_centavos, custo_centavos,
                                estoque_milesimal, estoque_minimo_milesimal, controla_estoque,
-                               ativo, origem, criado_em, atualizado_em)
+                               ativo, origem, validade, fornecedor_id, criado_em, atualizado_em)
          VALUES (@sku, @nome, @descricao, @unidade, @preco_centavos, @custo_centavos,
-                 0, @estoque_minimo_milesimal, @controla_estoque, 1, @origem, @ts, @ts)`
+                 0, @estoque_minimo_milesimal, @controla_estoque, 1, @origem,
+                 @validade, @fornecedor_id, @ts, @ts)`
       )
       .run({
         sku: dados.sku || null,
@@ -91,6 +94,8 @@ export function criar(dados) {
         estoque_minimo_milesimal: dados.estoqueMinimoMilesimal ?? 5000,
         controla_estoque: dados.controlaEstoque === false ? 0 : 1,
         origem: dados.origem || 'manual',
+        validade: dados.validade || null,
+        fornecedor_id: dados.fornecedorId || null,
         ts
       });
 
@@ -114,7 +119,8 @@ export function atualizar(id, dados) {
           SET sku = @sku, nome = @nome, descricao = @descricao, unidade = @unidade,
               preco_centavos = @preco_centavos, custo_centavos = @custo_centavos,
               estoque_minimo_milesimal = @estoque_minimo_milesimal,
-              controla_estoque = @controla_estoque, atualizado_em = @ts
+              controla_estoque = @controla_estoque, validade = @validade,
+              fornecedor_id = @fornecedor_id, atualizado_em = @ts
         WHERE id = @id`
     )
     .run({
@@ -127,6 +133,8 @@ export function atualizar(id, dados) {
       custo_centavos: dados.custoCentavos ?? null,
       estoque_minimo_milesimal: dados.estoqueMinimoMilesimal ?? 5000,
       controla_estoque: dados.controlaEstoque === false ? 0 : 1,
+      validade: dados.validade || null,
+      fornecedor_id: dados.fornecedorId || null,
       ts: agoraTimestamp()
     });
 }

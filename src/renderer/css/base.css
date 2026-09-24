@@ -206,6 +206,8 @@ tbody tr:hover { background: #FBFAF6; }
 tr.low  td.stockcell { color: var(--amber); font-weight: 700; }
 tr.zero td.stockcell { color: var(--rust);  font-weight: 700; }
 tr.inativo td { opacity: .5; }
+td.venc-proximo { color: var(--amber); font-weight: 700; }
+td.venc-vencido { color: var(--rust);  font-weight: 700; }
 
 .empty-state { text-align: center; padding: 30px 10px; color: var(--ink-soft); font-size: 13.5px; }
 .tabela-rolagem { overflow-x: auto; }

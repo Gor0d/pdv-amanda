@@ -18,7 +18,7 @@ import {
   caminhoBanco, pastaPdv, pastaBackups, pastaBackupPersonalizada, definirPastaBackupPersonalizada
 } from '../util/caminhos.js';
 import { ErroNegocio, CODIGOS, paraResposta } from '../util/erros.js';
-import { agoraTimestamp } from '../../compartilhado/formato/data.js';
+import { agoraTimestamp, hojeISO, somarDiasISO } from '../../compartilhado/formato/data.js';
 
 /**
  * Registra todos os canais. Cada handler devolve sempre
@@ -201,6 +201,9 @@ export function registrarIpc({ log = console } = {}) {
   }));
   canal('relatorios:diasComVenda', (limite) => relatoriosRepo.diasComVenda(limite));
   canal('relatorios:estoqueAtual', () => relatoriosRepo.estoqueAtual());
+  canal('relatorios:produtosAVencer', (dias = 10) =>
+    relatoriosRepo.produtosAVencer(somarDiasISO(hojeISO(), dias))
+  );
 
   // ------------------------------- Config -------------------------------
   canal('config:obterTudo', () => configRepo.obterTudo());

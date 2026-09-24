@@ -60,7 +60,8 @@ contextBridge.exposeInMainWorld('pdv', {
   relatorios: {
     doPeriodo: chamar('relatorios:doPeriodo'),
     diasComVenda: chamar('relatorios:diasComVenda'),
-    estoqueAtual: chamar('relatorios:estoqueAtual')
+    estoqueAtual: chamar('relatorios:estoqueAtual'),
+    produtosAVencer: chamar('relatorios:produtosAVencer')
   },
 
   config: {

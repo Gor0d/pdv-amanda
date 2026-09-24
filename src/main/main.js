@@ -6,6 +6,11 @@ import { abrirBanco, fecharBanco } from './db/conexao.js';
 import { registrarIpc } from './ipc/registrarIpc.js';
 import { registrarEsquemaPrivilegiado, registrarProtocolo, criarJanela } from './janela.js';
 import { caminhoBanco } from './util/caminhos.js';
+import { verificarValidadesProximas } from './servicos/notificacaoServico.js';
+
+// Enquanto o app fica aberto o dia inteiro no balcão, confere de novo a cada
+// tanto tempo — o serviço já se protege pra avisar no máximo uma vez por dia.
+const INTERVALO_AVISO_VALIDADE_MS = 6 * 60 * 60 * 1000;
 
 const dev = process.argv.includes('--dev');
 
@@ -50,6 +55,9 @@ if (!app.requestSingleInstanceLock()) {
     registrarProtocolo({ log });
     registrarIpc({ log });
     janela = criarJanela({ dev, log });
+
+    verificarValidadesProximas({ log });
+    setInterval(() => verificarValidadesProximas({ log }), INTERVALO_AVISO_VALIDADE_MS);
   });
 
   app.on('window-all-closed', () => {

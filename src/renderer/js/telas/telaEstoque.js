@@ -1,6 +1,7 @@
 import { api, tentar } from '../api.js';
 import { $, escapar, aoClicar, mostrarMsg, esconderMsg, toast, confirmar, abrirModal, fecharModal } from '../lib/dom.js';
 import { formatarBRL, formatarQtd, paraCentavos, paraMilesimal } from '/compartilhado/formato/moeda.js';
+import { formatarDataBR, hojeISO, somarDiasISO } from '/compartilhado/formato/data.js';
 
 let editandoId = null;
 let alertaMinimo = 5;
@@ -103,7 +104,19 @@ function instalarCalculoPreco() {
 export async function aoEntrar() {
   const cfg = await tentar(() => api.config.obterTudo(), { aoFalhar: () => {} });
   alertaMinimo = Number(cfg?.estoque_minimo_alerta ?? 5);
+  await carregarFornecedoresSelect();
   renderizar();
+}
+
+/** Recarrega as opções do select de fornecedor — chamado sempre que a aba abre,
+ * pra listar fornecedores cadastrados depois da última vez. */
+async function carregarFornecedoresSelect() {
+  const select = $('#p-fornecedor');
+  const selecionado = select.value;
+  const lista = (await tentar(() => api.fornecedores.listar({}), { aoFalhar: () => {} })) || [];
+  select.innerHTML = '<option value="">— nenhum —</option>' +
+    lista.map((f) => `<option value="${f.id}">${escapar(f.nome)}</option>`).join('');
+  select.value = selecionado;
 }
 
 // ------------------------------ Formulário -------------------------------
@@ -115,6 +128,8 @@ async function salvar() {
   const estoqueMilesimal = paraMilesimal($('#p-estoque').value);
   const custoTexto = $('#p-custo').value.trim();
   const custoCentavos = custoTexto ? paraCentavos(custoTexto) : null;
+  const validade = $('#p-validade').value || null;
+  const fornecedorId = $('#p-fornecedor').value ? Number($('#p-fornecedor').value) : null;
 
   if (!nome) return mostrarMsg('#p-msg', 'Informe o nome do produto.', 'err');
   if (precoCentavos === null) return mostrarMsg('#p-msg', 'Informe um preço válido (ex.: 5,49).', 'err');
@@ -122,7 +137,7 @@ async function salvar() {
 
   if (editandoId) {
     const ok = await tentar(
-      () => api.produtos.atualizar(editandoId, { nome, precoCentavos, custoCentavos }),
+      () => api.produtos.atualizar(editandoId, { nome, precoCentavos, custoCentavos, validade, fornecedorId }),
       { aoFalhar: (e) => mostrarMsg('#p-msg', e.message, 'err') }
     );
     if (ok === undefined) return;
@@ -152,7 +167,9 @@ async function salvar() {
     toast('Produto atualizado.');
   } else {
     const id = await tentar(
-      () => api.produtos.criar({ nome, precoCentavos, custoCentavos, codigos: codigo ? [codigo] : [] }),
+      () => api.produtos.criar({
+        nome, precoCentavos, custoCentavos, validade, fornecedorId, codigos: codigo ? [codigo] : []
+      }),
       { aoFalhar: (e) => mostrarMsg('#p-msg', e.message, 'err') }
     );
     if (id === undefined) return;
@@ -189,6 +206,8 @@ async function editar(id) {
     $('#p-margem').value = '';
   }
   $('#p-estoque').value = formatarQtd(p.estoque_milesimal);
+  $('#p-validade').value = p.validade ?? '';
+  $('#p-fornecedor').value = p.fornecedor_id ?? '';
   $('#form-titulo').textContent = `Editando: ${p.nome}`;
   $('#p-acoes-edicao').style.display = 'flex';
   esconderMsg('#p-msg');
@@ -198,7 +217,10 @@ async function editar(id) {
 
 function limparFormulario() {
   editandoId = null;
-  for (const c of ['#p-codigo', '#p-nome', '#p-custo', '#p-margem', '#p-lucro', '#p-preco', '#p-estoque']) $(c).value = '';
+  for (const c of ['#p-codigo', '#p-nome', '#p-custo', '#p-margem', '#p-lucro', '#p-preco', '#p-estoque', '#p-validade']) {
+    $(c).value = '';
+  }
+  $('#p-fornecedor').value = '';
   $('#form-titulo').textContent = 'Cadastrar produto';
   $('#p-acoes-edicao').style.display = 'none';
   esconderMsg('#p-msg');
@@ -255,6 +277,15 @@ function abrirEntrada(id, nome) {
   });
 }
 
+/** Classe de destaque pra validade: vencido, perto de vencer (10 dias) ou normal. */
+function classeValidade(validade) {
+  if (!validade) return '';
+  const limite = somarDiasISO(hojeISO(), 10);
+  if (validade < hojeISO()) return 'venc-vencido';
+  if (validade <= limite) return 'venc-proximo';
+  return '';
+}
+
 /** Markup sobre o custo: (preço - custo) / custo. Mesma conta do formulário de cadastro. */
 function calcularMargem(custoCentavos, precoCentavos) {
   if (custoCentavos == null || !custoCentavos) return '—';
@@ -281,7 +312,10 @@ async function renderizar() {
   el.innerHTML = `
     <table>
       <thead>
-        <tr><th>Código</th><th>Nome</th><th class="num">Custo</th><th class="num">Preço</th><th class="num">Margem</th><th class="num">Estoque</th><th></th></tr>
+        <tr>
+          <th>Código</th><th>Nome</th><th class="num">Custo</th><th class="num">Preço</th>
+          <th class="num">Margem</th><th class="num">Estoque</th><th>Validade</th><th>Fornecedor</th><th></th>
+        </tr>
       </thead>
       <tbody>
         ${lista.map((p) => `
@@ -292,6 +326,8 @@ async function renderizar() {
             <td class="num">${formatarBRL(p.preco_centavos)}</td>
             <td class="num">${calcularMargem(p.custo_centavos, p.preco_centavos)}</td>
             <td class="num stockcell">${p.controla_estoque ? formatarQtd(p.estoque_milesimal) : '—'}</td>
+            <td class="${classeValidade(p.validade)}">${p.validade ? formatarDataBR(p.validade) : '—'}</td>
+            <td>${escapar(p.fornecedor_nome ?? '—')}</td>
             <td class="acoes-linha">
               <button class="icon-btn" data-acao="entrada" data-id="${p.id}" data-nome="${escapar(p.nome)}" title="Entrada de estoque">↓</button>
               <button class="icon-btn" data-acao="editar" data-id="${p.id}" title="Editar">✎</button>

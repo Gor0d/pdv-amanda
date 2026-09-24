@@ -38,11 +38,12 @@ export async function renderizar() {
   if (dataInicio > dataFim) [dataInicio, dataFim] = [dataFim, dataInicio];
   esconderMsg('#rel-periodo-msg');
 
-  const [relatorio, vendas, estoque, dias] = await Promise.all([
+  const [relatorio, vendas, estoque, dias, aVencer] = await Promise.all([
     tentar(() => api.relatorios.doPeriodo(dataInicio, dataFim)),
     tentar(() => api.vendas.listarDoPeriodo(dataInicio, dataFim)),
     tentar(() => api.relatorios.estoqueAtual()),
-    tentar(() => api.relatorios.diasComVenda(10))
+    tentar(() => api.relatorios.diasComVenda(10)),
+    tentar(() => api.relatorios.produtosAVencer(10))
   ]);
   if (!relatorio) return;
 
@@ -59,6 +60,7 @@ export async function renderizar() {
   desenharProdutos(produtos, formas, resumo);
   desenharVendas(vendas || [], dataInicio !== dataFim);
   desenharEstoque(estoque || []);
+  desenharAVencer(aVencer || []);
 }
 
 function desenharChips(dias, dataInicio, dataFim) {
@@ -175,6 +177,41 @@ function desenharEstoque(estoque) {
             <td>${escapar(p.nome)}</td>
             <td class="num stockcell">${formatarQtd(p.estoque_milesimal)}</td>
           </tr>`).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+/** Dias entre hoje e a validade (negativo = já venceu). Construção local evita o
+ * desvio de fuso de `new Date(iso)` que a formatação de datas do app já evita. */
+function diasAteValidade(validadeISO) {
+  const [a, m, d] = validadeISO.split('-').map(Number);
+  const [ah, mh, dh] = hojeISO().split('-').map(Number);
+  const ms = new Date(a, m - 1, d) - new Date(ah, mh - 1, dh);
+  return Math.round(ms / 86400000);
+}
+
+function desenharAVencer(lista) {
+  const el = $('#rel-vencer');
+  if (!lista.length) {
+    el.innerHTML = '<div class="empty-state">Nenhum produto com estoque vencendo nos próximos 10 dias.</div>';
+    return;
+  }
+  el.innerHTML = `
+    <table>
+      <thead><tr><th>Código</th><th>Produto</th><th>Validade</th><th class="num">Dias</th><th class="num">Estoque</th></tr></thead>
+      <tbody>
+        ${lista.map((p) => {
+          const dias = diasAteValidade(p.validade);
+          return `
+          <tr class="${dias < 0 ? 'zero' : 'low'}">
+            <td class="mono">${escapar(p.codigo ?? '—')}</td>
+            <td>${escapar(p.nome)}</td>
+            <td>${formatarDataBR(p.validade)}</td>
+            <td class="num stockcell">${dias < 0 ? `Vencido há ${-dias}d` : `${dias}d`}</td>
+            <td class="num">${formatarQtd(p.estoque_milesimal)}</td>
+          </tr>`;
+        }).join('')}
       </tbody>
     </table>
   `;

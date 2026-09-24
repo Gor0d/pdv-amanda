@@ -151,6 +151,18 @@
           <input id="p-estoque" type="text" inputmode="decimal" placeholder="0" autocomplete="off">
         </div>
       </div>
+      <div class="grid-2 esp-topo-p">
+        <div>
+          <label for="p-fornecedor">Fornecedor</label>
+          <select id="p-fornecedor">
+            <option value="">— nenhum —</option>
+          </select>
+        </div>
+        <div>
+          <label for="p-validade">Validade</label>
+          <input id="p-validade" type="date">
+        </div>
+      </div>
       <div class="btn-row">
         <button class="btn btn-primary btn-compacto" data-acao="salvar-produto">Salvar</button>
       </div>
@@ -249,6 +261,11 @@
     <div class="card">
       <h2>Estoque atual</h2>
       <div id="rel-estoque" class="tabela-rolagem"></div>
+    </div>
+
+    <div class="card">
+      <h2>Produtos a vencer (próximos 10 dias)</h2>
+      <div id="rel-vencer" class="tabela-rolagem"></div>
     </div>
   </section>
 
