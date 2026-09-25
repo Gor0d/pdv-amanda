@@ -88,6 +88,24 @@ export function listarDoPeriodo(dataInicio, dataFim = dataInicio) {
     .all(dataInicio, dataFim);
 }
 
+export function proximoSeq(vendaId) {
+  const r = obterBanco()
+    .prepare('SELECT coalesce(MAX(seq), 0) AS max FROM venda_itens WHERE venda_id = ?')
+    .get(vendaId);
+  return r.max + 1;
+}
+
+/** Soma (nunca substitui) nos totais da venda — usado ao anexar itens numa venda já finalizada. */
+export function incrementarTotais(vendaId, { subtotalCentavos, totalCentavos }) {
+  obterBanco()
+    .prepare(
+      `UPDATE vendas
+          SET subtotal_centavos = subtotal_centavos + ?, total_centavos = total_centavos + ?
+        WHERE id = ?`
+    )
+    .run(subtotalCentavos, totalCentavos, vendaId);
+}
+
 export function marcarCancelada({ vendaId, motivo, por, sessaoAtualId, em }) {
   obterBanco()
     .prepare(

@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('pdv', {
 
   vendas: {
     finalizar: chamar('vendas:finalizar'),
+    adicionarItens: chamar('vendas:adicionarItens'),
     cancelar: chamar('vendas:cancelar'),
     porId: chamar('vendas:porId'),
     listarDoPeriodo: chamar('vendas:listarDoPeriodo'),
@@ -73,6 +74,7 @@ contextBridge.exposeInMainWorld('pdv', {
     info: chamar('sistema:info'),
     importarArquivo: chamar('sistema:importarArquivo'),
     backupAgora: chamar('sistema:backupAgora'),
+    exportarPdf: chamar('sistema:exportarPdf'),
     abrirPasta: chamar('sistema:abrirPasta'),
     escolherPastaBackup: chamar('sistema:escolherPastaBackup'),
     usarPastaBackupAutomatica: chamar('sistema:usarPastaBackupAutomatica')

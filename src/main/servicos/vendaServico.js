@@ -172,6 +172,133 @@ export function finalizar(entrada, { log = console } = {}) {
 }
 
 /**
+ * Anexa itens a uma venda já finalizada — o cliente lembrou de mais uma coisa
+ * depois de já ter pago. Não mexe nos itens/pagamentos que já existiam (são
+ * histórico), só soma: novas linhas em venda_itens (seq continua de onde
+ * parou), baixa de estoque dos itens novos, novo(s) pagamento(s) cobrindo
+ * exatamente a diferença, e os totais da venda incrementados (não
+ * recalculados do zero — desconto/acréscimo original continuam intocados).
+ */
+export function adicionarItens(vendaId, { itens, pagamentos, operador }, { log = console } = {}) {
+  const db = obterBanco();
+
+  if (!itens?.length) {
+    throw new ErroNegocio(CODIGOS.CARRINHO_VAZIO, 'Não há itens para adicionar.');
+  }
+
+  return db.transaction(() => {
+    const venda = vendasRepo.porId(vendaId);
+    if (!venda) throw new ErroNegocio(CODIGOS.VENDA_NAO_ENCONTRADA, 'Venda não encontrada.');
+    if (venda.status === 'cancelada') {
+      throw new ErroNegocio(CODIGOS.VENDA_JA_CANCELADA, 'Não é possível adicionar itens a uma venda cancelada.');
+    }
+
+    const itensResolvidos = itens.map((it, idx) => {
+      const p = produtosRepo.porId(it.produtoId);
+      if (!p) {
+        throw new ErroNegocio(
+          CODIGOS.PRODUTO_NAO_ENCONTRADO,
+          `O produto da linha ${idx + 1} não existe mais no cadastro.`
+        );
+      }
+      return {
+        produto: p,
+        codigoBarras: it.codigoBarras ?? null,
+        precoUnitCentavos: Math.trunc(it.precoUnitCentavos ?? p.preco_centavos),
+        qtdMilesimal: Math.trunc(it.qtdMilesimal)
+      };
+    });
+
+    const totaisNovos = calcularTotais(itensResolvidos);
+
+    const pagamentosNovos = (pagamentos || []).map((p) => ({
+      forma: p.forma,
+      valorCentavos: Math.trunc(p.valorCentavos),
+      recebidoCentavos: p.recebidoCentavos != null ? Math.trunc(p.recebidoCentavos) : null,
+      bandeira: p.bandeira ?? null,
+      parcelas: p.parcelas ?? 1,
+      autorizacao: p.autorizacao ?? null
+    }));
+    const situacao = calcularPagamento(totaisNovos.totalCentavos, pagamentosNovos);
+    if (!situacao.completo) {
+      throw new ErroNegocio(
+        CODIGOS.PAGAMENTO_INCOMPLETO,
+        situacao.faltaCentavos > 0
+          ? 'Os pagamentos informados não cobrem o valor dos itens adicionados.'
+          : 'Os pagamentos informados passam do valor dos itens adicionados.',
+        { faltaCentavos: situacao.faltaCentavos, totalCentavos: totaisNovos.totalCentavos }
+      );
+    }
+
+    const permiteNegativo = configRepo.obterBooleano('estoque_negativo_permitido');
+    if (!permiteNegativo) {
+      for (const it of itensResolvidos) {
+        if (it.produto.controla_estoque && it.produto.estoque_milesimal < it.qtdMilesimal) {
+          throw new ErroNegocio(
+            CODIGOS.ESTOQUE_INSUFICIENTE,
+            `"${it.produto.nome}" não tem estoque suficiente.`,
+            { produtoId: it.produto.id, disponivelMilesimal: it.produto.estoque_milesimal }
+          );
+        }
+      }
+    }
+
+    let seq = vendasRepo.proximoSeq(vendaId);
+    const ts = agoraTimestamp();
+
+    itensResolvidos.forEach((it, i) => {
+      const calc = totaisNovos.itens[i];
+      vendasRepo.inserirItem({
+        venda_id: vendaId,
+        seq: seq++,
+        produto_id: it.produto.id,
+        codigo_barras: it.codigoBarras,
+        descricao: it.produto.nome,
+        unidade: it.produto.unidade,
+        preco_unit_centavos: it.precoUnitCentavos,
+        qtd_milesimal: it.qtdMilesimal,
+        desconto_item_centavos: calc.descontoItemCentavos,
+        rateio_desconto_venda_centavos: calc.rateioDescontoVendaCentavos,
+        total_item_centavos: calc.totalItemCentavos,
+        custo_unit_centavos: it.produto.custo_centavos ?? null
+      });
+
+      estoqueRepo.lancar(it.produto.id, 'venda', -it.qtdMilesimal, {
+        vendaId,
+        custoUnitCentavos: it.produto.custo_centavos ?? null,
+        criadoPor: operador ?? null
+      });
+    });
+
+    for (const p of pagamentosNovos) {
+      const trocoDaLinha =
+        p.forma === 'dinheiro' && p.recebidoCentavos != null
+          ? Math.max(0, p.recebidoCentavos - p.valorCentavos)
+          : 0;
+      vendasRepo.inserirPagamento({
+        venda_id: vendaId,
+        forma: p.forma,
+        valor_centavos: p.valorCentavos,
+        valor_recebido_centavos: p.recebidoCentavos,
+        troco_centavos: trocoDaLinha,
+        bandeira: p.bandeira,
+        parcelas: p.parcelas,
+        autorizacao: p.autorizacao,
+        criado_em: ts
+      });
+    }
+
+    vendasRepo.incrementarTotais(vendaId, {
+      subtotalCentavos: totaisNovos.subtotalCentavos,
+      totalCentavos: totaisNovos.totalCentavos
+    });
+
+    log.info?.(`${itensResolvidos.length} item(ns) adicionado(s) à venda ${venda.numero}.`);
+    return { vendaId, totaisNovos, trocoCentavos: situacao.trocoCentavos };
+  })();
+}
+
+/**
  * Cancela uma venda finalizada, revertendo o estoque. Nada é apagado: a venda
  * fica com status 'cancelada' e o estorno entra como movimento novo no ledger.
  */

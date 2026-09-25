@@ -1,11 +1,22 @@
 import { api, tentar } from '../api.js';
 import { $, escapar, aoClicar, mostrarMsg, esconderMsg, toast, confirmar, abrirModal, fecharModal } from '../lib/dom.js';
+import { escolherPagamento } from '../lib/pagamento.js';
 import { formatarBRL, formatarQtd } from '/compartilhado/formato/moeda.js';
 import { formatarDataBR, hojeISO } from '/compartilhado/formato/data.js';
+import { calcularTotais } from '/compartilhado/calculos/totais.js';
 
 const NOME_FORMA = {
   dinheiro: 'Dinheiro', pix: 'PIX', debito: 'Débito', credito: 'Crédito', fiado: 'Fiado'
 };
+
+// Quantos itens de estoque aparecem no cartão do relatório sem precisar abrir
+// o relatório completo — pedido explícito pra não poluir a tela com o
+// catálogo inteiro toda vez que alguém olha o período.
+const ESTOQUE_RESUMO_LIMITE = 15;
+
+// Guarda o último período carregado, pra exportar em PDF sem precisar buscar
+// tudo de novo do banco.
+let ultimoRelatorio = null;
 
 export function montar() {
   const secao = $('#tab-relatorios');
@@ -20,6 +31,8 @@ export function montar() {
     }
     if (el.dataset.acao === 'cancelar-venda') cancelarVenda(Number(el.dataset.id), el.dataset.numero);
     if (el.dataset.acao === 'ver-venda') verVenda(Number(el.dataset.id));
+    if (el.dataset.acao === 'exportar-pdf-periodo') exportarPeriodoPdf();
+    if (el.dataset.acao === 'ver-estoque-completo') abrirEstoqueCompleto();
   });
 }
 
@@ -55,6 +68,8 @@ export async function renderizar() {
   $('#rel-lucro-msg').textContent = resumo.itens_sem_custo
     ? `Não conta ${resumo.itens_sem_custo} item(ns) vendido(s) sem custo cadastrado no produto.`
     : '';
+
+  ultimoRelatorio = { dataInicio, dataFim, resumo, produtos, formas, vendas: vendas || [] };
 
   desenharChips(dias || [], dataInicio, dataFim);
   desenharProdutos(produtos, formas, resumo);
@@ -161,25 +176,41 @@ function desenharVendas(vendas, mostrarData) {
   `;
 }
 
+function linhaEstoque(p) {
+  return `
+    <tr class="${p.estoque_milesimal === 0 ? 'zero' : (p.estoque_milesimal <= p.estoque_minimo_milesimal ? 'low' : '')}">
+      <td class="mono">${escapar(p.codigo ?? '—')}</td>
+      <td>${escapar(p.nome)}</td>
+      <td class="num stockcell">${formatarQtd(p.estoque_milesimal)}</td>
+    </tr>`;
+}
+
+let ultimoEstoqueCompleto = [];
+
+/** Mostra só os produtos com estoque mais baixo (a repoRepo já traz ordenado
+ * assim) — a lista inteira polui a tela toda vez que alguém confere um
+ * período; quem quiser o catálogo completo abre o relatório dedicado. */
 function desenharEstoque(estoque) {
+  ultimoEstoqueCompleto = estoque;
   const el = $('#rel-estoque');
+  const nota = $('#rel-estoque-nota');
+
   if (!estoque.length) {
     el.innerHTML = '<div class="empty-state">Nenhum produto cadastrado.</div>';
+    nota.textContent = '';
     return;
   }
+
+  const visiveis = estoque.slice(0, ESTOQUE_RESUMO_LIMITE);
   el.innerHTML = `
     <table>
       <thead><tr><th>Código</th><th>Produto</th><th class="num">Estoque restante</th></tr></thead>
-      <tbody>
-        ${estoque.map((p) => `
-          <tr class="${p.estoque_milesimal === 0 ? 'zero' : (p.estoque_milesimal <= p.estoque_minimo_milesimal ? 'low' : '')}">
-            <td class="mono">${escapar(p.codigo ?? '—')}</td>
-            <td>${escapar(p.nome)}</td>
-            <td class="num stockcell">${formatarQtd(p.estoque_milesimal)}</td>
-          </tr>`).join('')}
-      </tbody>
+      <tbody>${visiveis.map(linhaEstoque).join('')}</tbody>
     </table>
   `;
+  nota.textContent = estoque.length > visiveis.length
+    ? `Mostrando os ${visiveis.length} produtos com estoque mais baixo, de ${estoque.length} cadastrados no total.`
+    : '';
 }
 
 /** Dias entre hoje e a validade (negativo = já venceu). Construção local evita o
@@ -217,6 +248,127 @@ function desenharAVencer(lista) {
   `;
 }
 
+// ------------------------------ Exportar PDF ------------------------------
+
+async function exportarPeriodoPdf() {
+  if (!ultimoRelatorio) return;
+  const { dataInicio, dataFim, resumo, produtos, vendas } = ultimoRelatorio;
+
+  const periodo = dataInicio === dataFim
+    ? formatarDataBR(dataInicio)
+    : `${formatarDataBR(dataInicio)} até ${formatarDataBR(dataFim)}`;
+
+  const html = `
+    <h1>Relatório de vendas</h1>
+    <div class="sub">Período: ${periodo}</div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="label">Total vendido</div><div class="value">${formatarBRL(resumo.total_centavos)}</div></div>
+      <div class="stat"><div class="label">Itens vendidos</div><div class="value">${formatarQtd(resumo.itens_milesimal)}</div></div>
+      <div class="stat"><div class="label">Vendas realizadas</div><div class="value">${resumo.qtd_vendas}</div></div>
+      <div class="stat"><div class="label">Lucro estimado</div><div class="value">${formatarBRL(resumo.lucro_centavos)}</div></div>
+    </div>
+
+    <h2>Produtos vendidos</h2>
+    <table>
+      <thead><tr><th>Produto</th><th class="num">Qtd.</th><th class="num">Total</th><th class="num">Lucro</th></tr></thead>
+      <tbody>
+        ${produtos.map((p) => `
+          <tr>
+            <td>${escapar(p.descricao)}</td>
+            <td class="num">${formatarQtd(p.qtd_milesimal)}</td>
+            <td class="num">${formatarBRL(p.total_centavos)}</td>
+            <td class="num">${p.lucro_centavos != null ? formatarBRL(p.lucro_centavos) : '—'}</td>
+          </tr>`).join('') || '<tr><td colspan="4">Nenhuma venda no período.</td></tr>'}
+      </tbody>
+    </table>
+
+    <h2>Vendas do período</h2>
+    <table>
+      <thead><tr><th>Nº</th><th>Data</th><th>Hora</th><th>Origem</th><th>Forma</th><th class="num">Total</th><th>Situação</th></tr></thead>
+      <tbody>
+        ${vendas.map((v) => `
+          <tr>
+            <td>${String(v.numero).padStart(6, '0')}</td>
+            <td>${formatarDataBR(v.data)}</td>
+            <td>${escapar(v.hora)}</td>
+            <td>${escapar(origemVenda(v))}</td>
+            <td>${(v.formas || '').split(',').filter(Boolean).map((f) => NOME_FORMA[f] ?? f).join(', ') || '—'}</td>
+            <td class="num">${formatarBRL(v.total_centavos)}</td>
+            <td>${v.status === 'cancelada' ? 'Cancelada' : 'Finalizada'}</td>
+          </tr>`).join('') || '<tr><td colspan="7">Nenhuma venda no período.</td></tr>'}
+      </tbody>
+    </table>
+
+    <div class="rodape">Gerado em ${formatarDataBR(hojeISO())} pelo Sistema de Vendas.</div>
+  `;
+
+  const nomeArquivo = dataInicio === dataFim
+    ? `vendas-${dataInicio}.pdf`
+    : `vendas-${dataInicio}_a_${dataFim}.pdf`;
+
+  const caminho = await tentar(
+    () => api.sistema.exportarPdf({ titulo: 'Relatório de vendas', html, sugestaoNome: nomeArquivo }),
+    { aoFalhar: (e) => toast(e.message, 'err') }
+  );
+  if (caminho) toast(`PDF salvo em ${caminho}`);
+}
+
+function construirHtmlEstoque(lista) {
+  return `
+    <h1>Relatório de estoque atual</h1>
+    <div class="sub">${lista.length} produto(s) cadastrado(s) com controle de estoque.</div>
+    <table>
+      <thead><tr><th>Código</th><th>Produto</th><th class="num">Estoque</th><th class="num">Estoque mínimo</th></tr></thead>
+      <tbody>
+        ${lista.map((p) => `
+          <tr>
+            <td>${escapar(p.codigo ?? '—')}</td>
+            <td>${escapar(p.nome)}</td>
+            <td class="num">${formatarQtd(p.estoque_milesimal)}</td>
+            <td class="num">${formatarQtd(p.estoque_minimo_milesimal)}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    <div class="rodape">Gerado em ${formatarDataBR(hojeISO())} pelo Sistema de Vendas.</div>
+  `;
+}
+
+async function exportarEstoquePdf() {
+  const caminho = await tentar(
+    () => api.sistema.exportarPdf({
+      titulo: 'Relatório de estoque',
+      html: construirHtmlEstoque(ultimoEstoqueCompleto),
+      sugestaoNome: `estoque-${hojeISO()}.pdf`
+    }),
+    { aoFalhar: (e) => toast(e.message, 'err') }
+  );
+  if (caminho) toast(`PDF salvo em ${caminho}`);
+}
+
+function abrirEstoqueCompleto() {
+  abrirModal(`
+    <h3>Estoque completo</h3>
+    <div class="sub">${ultimoEstoqueCompleto.length} produto(s) cadastrado(s) com controle de estoque.</div>
+    <div class="tabela-rolagem tabela-rolagem-alta">
+      <table>
+        <thead><tr><th>Código</th><th>Produto</th><th class="num">Estoque restante</th></tr></thead>
+        <tbody>${ultimoEstoqueCompleto.map(linhaEstoque).join('')}</tbody>
+      </table>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" data-r="0">Fechar</button>
+      <button class="btn btn-primary" data-r="pdf">Exportar PDF</button>
+    </div>
+  `, {
+    aoMontar(caixa) {
+      caixa.querySelector('[data-r="0"]').addEventListener('click', fecharModal);
+      caixa.querySelector('[data-r="pdf"]').addEventListener('click', exportarEstoquePdf);
+      caixa.querySelector('[data-r="0"]').focus();
+    }
+  });
+}
+
 // ------------------------------ Ações ------------------------------------
 
 async function verVenda(id) {
@@ -249,13 +401,163 @@ async function verVenda(id) {
     ${v.status === 'cancelada' ? `
       <div class="linha-info"><span class="rotulo">Motivo do cancelamento</span>
         <span class="valor">${escapar(v.cancelada_motivo ?? '')}</span></div>` : ''}
-    <div class="btn-row"><button class="btn btn-ghost" data-r="0">Fechar</button></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" data-r="0">Fechar</button>
+      ${v.status === 'finalizada' ? '<button class="btn btn-primary" data-r="add">Adicionar itens</button>' : ''}
+    </div>
   `, {
     aoMontar(caixa) {
       caixa.querySelector('[data-r="0"]').addEventListener('click', fecharModal);
       caixa.querySelector('[data-r="0"]').focus();
+      caixa.querySelector('[data-r="add"]')?.addEventListener('click', () => abrirAdicionarItens(v));
     }
   });
+}
+
+/**
+ * Adiciona itens a uma venda já paga — cliente lembrou de mais uma coisa
+ * depois de fechar a conta. Os itens ficam só na tela até confirmar com
+ * pagamento; nada é gravado até então (sem baixa de estoque de item que a
+ * pessoa desistiu de adicionar no meio do caminho).
+ */
+function abrirAdicionarItens(venda) {
+  let itensNovos = [];
+
+  const desenhar = (caixa) => {
+    const total = calcularTotais(itensNovos).totalCentavos;
+    caixa.querySelector('#ai-itens').innerHTML = itensNovos.length
+      ? itensNovos.map((i, idx) => `
+          <div class="rline">
+            <span class="name">${escapar(i.nome)}</span>
+            <span class="leader"></span>
+            <span class="mono qty">${formatarQtd(i.qtdMilesimal)}</span>
+            <span class="price">${formatarBRL(i.precoUnitCentavos * i.qtdMilesimal / 1000)}</span>
+            <span class="rm" data-i="${idx}" title="Remover">✕</span>
+          </div>`).join('')
+      : '<div class="empty-state">Nenhum item adicionado ainda.</div>';
+    caixa.querySelector('#ai-total').textContent = formatarBRL(total);
+    caixa.querySelector('[data-r="confirmar"]').disabled = itensNovos.length === 0;
+  };
+
+  abrirModal(`
+    <h3>Adicionar itens à venda ${String(venda.numero).padStart(6, '0')}</h3>
+    <div class="sub">Os itens só entram na venda depois de confirmar o pagamento da diferença.</div>
+
+    <div class="scan-row">
+      <input id="ai-termo" type="text" autocomplete="off" placeholder="Digite o nome do produto...">
+    </div>
+    <div id="ai-lista" class="lista-rolagem"></div>
+    <div id="ai-msg" class="msg"></div>
+
+    <div id="ai-itens" class="esp-topo"></div>
+
+    <div class="rtotal">
+      <span class="label">Total a adicionar</span>
+      <span class="amount" id="ai-total">R$ 0,00</span>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" data-r="voltar">Voltar</button>
+      <button class="btn btn-primary" data-r="confirmar" disabled>Cobrar e adicionar</button>
+    </div>
+  `, {
+    aoMontar(caixa) {
+      const termo = caixa.querySelector('#ai-termo');
+      const listaEl = caixa.querySelector('#ai-lista');
+      let resultados = [];
+      let ativo = 0;
+
+      const desenharBusca = () => {
+        if (!termo.value.trim()) { listaEl.innerHTML = ''; return; }
+        if (!resultados.length) {
+          listaEl.innerHTML = '<div class="empty-state">Nenhum produto encontrado.</div>';
+          return;
+        }
+        listaEl.innerHTML = resultados.map((p, i) => `
+          <div class="rline ${i === ativo ? 'selecionada' : ''}" data-i="${i}">
+            <span class="name">${escapar(p.nome)}</span>
+            <span class="leader"></span>
+            <span class="price">${formatarBRL(p.preco_centavos)}</span>
+          </div>
+        `).join('');
+      };
+
+      const buscar = async () => {
+        const t = termo.value.trim();
+        resultados = t ? (await tentar(() => api.produtos.listar({ termo: t, limite: 20 }))) || [] : [];
+        ativo = 0;
+        desenharBusca();
+      };
+
+      const escolher = (i) => {
+        const p = resultados[i];
+        if (!p) return;
+        const existente = itensNovos.find((it) => it.produtoId === p.id);
+        if (existente) existente.qtdMilesimal += 1000;
+        else itensNovos.push({ produtoId: p.id, nome: p.nome, precoUnitCentavos: p.preco_centavos, qtdMilesimal: 1000 });
+        termo.value = '';
+        resultados = [];
+        desenharBusca();
+        desenhar(caixa);
+        termo.focus();
+      };
+
+      termo.addEventListener('input', buscar);
+      termo.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); ativo = Math.min(resultados.length - 1, ativo + 1); desenharBusca(); }
+        if (e.key === 'ArrowUp') { e.preventDefault(); ativo = Math.max(0, ativo - 1); desenharBusca(); }
+        if (e.key === 'Enter') { e.preventDefault(); escolher(ativo); }
+      });
+      listaEl.addEventListener('click', (e) => {
+        const linha = e.target.closest('[data-i]');
+        if (linha) escolher(Number(linha.dataset.i));
+      });
+
+      // Wrapper recriado a cada abertura do modal — nunca delegar em `caixa`
+      // direto, que é reaproveitado entre aberturas (ver bug corrigido em
+      // telaComandas.js: listener duplicado acumula clique fantasma).
+      caixa.querySelector('#ai-itens').addEventListener('click', (e) => {
+        const rm = e.target.closest('[data-i]');
+        if (!rm) return;
+        itensNovos.splice(Number(rm.dataset.i), 1);
+        desenhar(caixa);
+      });
+
+      caixa.querySelector('[data-r="voltar"]').addEventListener('click', () => verVenda(venda.id));
+      caixa.querySelector('[data-r="confirmar"]').addEventListener('click', () => confirmarAdicao(venda, itensNovos));
+      caixa._aoEscape = () => verVenda(venda.id);
+
+      desenhar(caixa);
+      termo.focus();
+    }
+  });
+}
+
+async function confirmarAdicao(venda, itensNovos) {
+  if (!itensNovos.length) return;
+  const total = calcularTotais(itensNovos).totalCentavos;
+
+  // escolherPagamento() reaproveita o mesmo #modal — ao voltar sem escolher,
+  // reabre esta mesma tela de adicionar itens com o que já tinha sido posto.
+  const pagamento = await escolherPagamento(total);
+  if (!pagamento) { abrirAdicionarItens(venda); return; }
+
+  const r = await tentar(
+    () => api.vendas.adicionarItens(venda.id, {
+      itens: itensNovos.map((i) => ({
+        produtoId: i.produtoId, precoUnitCentavos: i.precoUnitCentavos, qtdMilesimal: i.qtdMilesimal
+      })),
+      pagamentos: [{
+        forma: pagamento.forma, valorCentavos: pagamento.valorCentavos, recebidoCentavos: pagamento.recebidoCentavos
+      }]
+    }),
+    { aoFalhar: (e) => toast(e.message, 'err') }
+  );
+  if (r === undefined) return;
+
+  toast(`${itensNovos.length} item(ns) adicionado(s) — ${formatarBRL(total)} a mais.`);
+  await verVenda(venda.id);
+  renderizar();
 }
 
 async function cancelarVenda(id, numero) {

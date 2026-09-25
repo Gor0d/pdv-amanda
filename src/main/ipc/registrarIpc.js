@@ -13,6 +13,7 @@ import * as comandaServico from '../servicos/comandaServico.js';
 import * as fornecedoresRepo from '../repos/fornecedoresRepo.js';
 import { importar } from '../servicos/importacaoServico.js';
 import { backupAgora, ultimoBackup } from '../servicos/backupServico.js';
+import { exportarPdf } from '../servicos/pdfServico.js';
 import { obterBanco } from '../db/conexao.js';
 import {
   caminhoBanco, pastaPdv, pastaBackups, pastaBackupPersonalizada, definirPastaBackupPersonalizada
@@ -144,6 +145,7 @@ export function registrarIpc({ log = console } = {}) {
 
   // -------------------------------- Vendas ------------------------------
   canal('vendas:finalizar', (entrada) => vendaServico.finalizar(entrada, { log }));
+  canal('vendas:adicionarItens', (vendaId, entrada) => vendaServico.adicionarItens(vendaId, entrada, { log }));
   canal('vendas:cancelar', (entrada) => vendaServico.cancelar(entrada, { log }));
   canal('vendas:porId', (id) => vendasRepo.porId(id));
   canal('vendas:listarDoPeriodo', (dataInicio, dataFim) => vendasRepo.listarDoPeriodo(dataInicio, dataFim));
@@ -251,6 +253,7 @@ export function registrarIpc({ log = console } = {}) {
   });
 
   canal('sistema:backupAgora', () => backupAgora({ log }));
+  canal('sistema:exportarPdf', (entrada) => exportarPdf(entrada, { log }));
 
   canal('sistema:abrirPasta', (qual) => {
     shell.openPath(qual === 'banco' ? app.getPath('userData') : pastaBackups());

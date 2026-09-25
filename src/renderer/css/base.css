@@ -211,6 +211,7 @@ td.venc-vencido { color: var(--rust);  font-weight: 700; }
 
 .empty-state { text-align: center; padding: 30px 10px; color: var(--ink-soft); font-size: 13.5px; }
 .tabela-rolagem { overflow-x: auto; }
+.tabela-rolagem-alta { max-height: 50vh; overflow-y: auto; }
 
 /* --------------------------------- Modal -------------------------------- */
 
