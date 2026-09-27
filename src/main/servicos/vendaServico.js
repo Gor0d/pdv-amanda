@@ -299,6 +299,84 @@ export function adicionarItens(vendaId, { itens, pagamentos, operador }, { log =
 }
 
 /**
+ * Remove um item de uma venda já finalizada — devolução parcial, sem cancelar
+ * a venda inteira. Nunca apaga nem edita a linha original (é histórico): entra
+ * uma linha nova compensatória, negativa, com "(removido)" na descrição. O
+ * estoque volta (estorno_venda) e um pagamento negativo registra por onde o
+ * dinheiro saiu de volta, mantendo SUM(pagamentos) == vendas.total_centavos.
+ */
+export function removerItem(vendaId, itemId, { motivo, operador, formaReembolso }, { log = console } = {}) {
+  const db = obterBanco();
+
+  if (!motivo || !String(motivo).trim()) {
+    throw new ErroNegocio(CODIGOS.DADOS_INVALIDOS, 'Informe o motivo da remoção.');
+  }
+  if (!formaReembolso) {
+    throw new ErroNegocio(CODIGOS.DADOS_INVALIDOS, 'Informe como o valor foi devolvido.');
+  }
+
+  return db.transaction(() => {
+    const venda = vendasRepo.porId(vendaId);
+    if (!venda) throw new ErroNegocio(CODIGOS.VENDA_NAO_ENCONTRADA, 'Venda não encontrada.');
+    if (venda.status === 'cancelada') {
+      throw new ErroNegocio(CODIGOS.VENDA_JA_CANCELADA, 'Não é possível remover itens de uma venda cancelada.');
+    }
+
+    const item = vendasRepo.itemPorId(vendaId, itemId);
+    if (!item) throw new ErroNegocio(CODIGOS.ITEM_NAO_ENCONTRADO, 'Item não encontrado nessa venda.');
+    if (item.total_item_centavos < 0) {
+      throw new ErroNegocio(CODIGOS.ITEM_NAO_ENCONTRADO, 'Esse item já é uma remoção — não dá pra remover de novo.');
+    }
+
+    if (item.produto_id) {
+      estoqueRepo.lancar(item.produto_id, 'estorno_venda', item.qtd_milesimal, {
+        vendaId,
+        motivo: `Remoção de item da venda ${venda.numero}: ${String(motivo).trim()}`,
+        criadoPor: operador ?? null
+      });
+    }
+
+    // Linha compensatória: mesmo produto, tudo negativo, pra bater a soma de
+    // venda_itens.total_item_centavos sem tocar na linha original.
+    vendasRepo.inserirItem({
+      venda_id: vendaId,
+      seq: vendasRepo.proximoSeq(vendaId),
+      produto_id: item.produto_id,
+      codigo_barras: item.codigo_barras,
+      descricao: `${item.descricao} (removido)`,
+      unidade: item.unidade,
+      preco_unit_centavos: item.preco_unit_centavos,
+      qtd_milesimal: -item.qtd_milesimal,
+      desconto_item_centavos: -item.desconto_item_centavos,
+      rateio_desconto_venda_centavos: -item.rateio_desconto_venda_centavos,
+      total_item_centavos: -item.total_item_centavos,
+      custo_unit_centavos: item.custo_unit_centavos
+    });
+
+    const bruto = item.total_item_centavos + item.desconto_item_centavos + item.rateio_desconto_venda_centavos;
+    vendasRepo.incrementarTotais(vendaId, {
+      subtotalCentavos: -bruto,
+      totalCentavos: -item.total_item_centavos
+    });
+
+    vendasRepo.inserirPagamento({
+      venda_id: vendaId,
+      forma: formaReembolso,
+      valor_centavos: -item.total_item_centavos,
+      valor_recebido_centavos: null,
+      troco_centavos: 0,
+      bandeira: null,
+      parcelas: 1,
+      autorizacao: null,
+      criado_em: agoraTimestamp()
+    });
+
+    log.info?.(`Item "${item.descricao}" removido da venda ${venda.numero}: ${motivo}`);
+    return { vendaId, itemId, reembolsoCentavos: item.total_item_centavos };
+  })();
+}
+
+/**
  * Cancela uma venda finalizada, revertendo o estoque. Nada é apagado: a venda
  * fica com status 'cancelada' e o estorno entra como movimento novo no ledger.
  */

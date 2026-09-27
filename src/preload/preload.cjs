@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld('pdv', {
   vendas: {
     finalizar: chamar('vendas:finalizar'),
     adicionarItens: chamar('vendas:adicionarItens'),
+    removerItem: chamar('vendas:removerItem'),
     cancelar: chamar('vendas:cancelar'),
     porId: chamar('vendas:porId'),
     listarDoPeriodo: chamar('vendas:listarDoPeriodo'),

@@ -95,6 +95,12 @@ export function proximoSeq(vendaId) {
   return r.max + 1;
 }
 
+export function itemPorId(vendaId, itemId) {
+  return obterBanco()
+    .prepare('SELECT * FROM venda_itens WHERE id = ? AND venda_id = ?')
+    .get(itemId, vendaId) || null;
+}
+
 /** Soma (nunca substitui) nos totais da venda — usado ao anexar itens numa venda já finalizada. */
 export function incrementarTotais(vendaId, { subtotalCentavos, totalCentavos }) {
   obterBanco()

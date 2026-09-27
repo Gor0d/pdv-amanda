@@ -94,3 +94,50 @@ export function escolherPagamento(totalCentavos) {
     });
   });
 }
+
+/**
+ * Versão sem "valor recebido"/troco — pra casos onde não se está cobrando,
+ * só registrando por qual canal o dinheiro voltou (ex.: devolver um item de
+ * uma venda já fechada). Resolve com {forma} ou null se cancelar.
+ */
+export function escolherForma({ titulo = 'Forma de pagamento', subtitulo = '' } = {}) {
+  return new Promise((resolve) => {
+    let formaEscolhida = null;
+    const responder = (v) => { fecharModal(); resolve(v); };
+
+    abrirModal(`
+      <h3>${titulo}</h3>
+      ${subtitulo ? `<div class="sub">${subtitulo}</div>` : ''}
+
+      <div class="grid-2">
+        ${FORMAS.map((f) => `
+          <button class="btn btn-ghost" data-forma="${f.forma}">${f.rotulo}</button>
+        `).join('')}
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-ghost" data-r="0">Voltar</button>
+        <button class="btn btn-primary" data-r="1" disabled>Confirmar</button>
+      </div>
+    `, {
+      aoMontar(caixa) {
+        const botoesForma = [...caixa.querySelectorAll('[data-forma]')];
+        const btnConfirmar = caixa.querySelector('[data-r="1"]');
+
+        for (const b of botoesForma) {
+          b.addEventListener('click', () => {
+            formaEscolhida = b.dataset.forma;
+            for (const outro of botoesForma) {
+              outro.classList.toggle('btn-primary', outro === b);
+              outro.classList.toggle('btn-ghost', outro !== b);
+            }
+            btnConfirmar.disabled = false;
+          });
+        }
+        btnConfirmar.addEventListener('click', () => { if (formaEscolhida) responder({ forma: formaEscolhida }); });
+        caixa.querySelector('[data-r="0"]').addEventListener('click', () => responder(null));
+        caixa._aoEscape = () => responder(null);
+      }
+    });
+  });
+}

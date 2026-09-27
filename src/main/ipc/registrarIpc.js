@@ -146,6 +146,7 @@ export function registrarIpc({ log = console } = {}) {
   // -------------------------------- Vendas ------------------------------
   canal('vendas:finalizar', (entrada) => vendaServico.finalizar(entrada, { log }));
   canal('vendas:adicionarItens', (vendaId, entrada) => vendaServico.adicionarItens(vendaId, entrada, { log }));
+  canal('vendas:removerItem', (vendaId, itemId, entrada) => vendaServico.removerItem(vendaId, itemId, entrada, { log }));
   canal('vendas:cancelar', (entrada) => vendaServico.cancelar(entrada, { log }));
   canal('vendas:porId', (id) => vendasRepo.porId(id));
   canal('vendas:listarDoPeriodo', (dataInicio, dataFim) => vendasRepo.listarDoPeriodo(dataInicio, dataFim));

@@ -1,6 +1,6 @@
 import { api, tentar } from '../api.js';
 import { $, escapar, aoClicar, mostrarMsg, esconderMsg, toast, confirmar, abrirModal, fecharModal } from '../lib/dom.js';
-import { escolherPagamento } from '../lib/pagamento.js';
+import { escolherPagamento, escolherForma } from '../lib/pagamento.js';
 import { formatarBRL, formatarQtd } from '/compartilhado/formato/moeda.js';
 import { formatarDataBR, hojeISO } from '/compartilhado/formato/data.js';
 import { calcularTotais } from '/compartilhado/calculos/totais.js';
@@ -383,10 +383,13 @@ async function verVenda(id) {
     <div class="receipt sem-moldura">
       ${v.itens.map((i) => `
         <div class="rline">
-          <span class="name">${escapar(i.descricao)}</span>
+          <span class="name ${i.total_item_centavos < 0 ? 'txt-perigo' : ''}">${escapar(i.descricao)}</span>
           <span class="leader"></span>
-          <span class="mono qty">${formatarQtd(i.qtd_milesimal)}</span>
+          <span class="mono qty">${formatarQtd(Math.abs(i.qtd_milesimal))}</span>
           <span class="price">${formatarBRL(i.total_item_centavos)}</span>
+          ${v.status === 'finalizada' && i.total_item_centavos > 0
+            ? `<span class="rm" data-remover-item="${i.id}" data-descricao="${escapar(i.descricao)}" title="Remover item">✕</span>`
+            : ''}
         </div>`).join('')}
       <div class="rtotal">
         <span class="label">Total</span>
@@ -396,7 +399,7 @@ async function verVenda(id) {
     ${v.pagamentos.map((p) => `
       <div class="linha-info">
         <span class="rotulo">${NOME_FORMA[p.forma] ?? escapar(p.forma)}</span>
-        <span class="valor">${formatarBRL(p.valor_centavos)}</span>
+        <span class="valor">${p.valor_centavos < 0 ? `Devolvido: ${formatarBRL(-p.valor_centavos)}` : formatarBRL(p.valor_centavos)}</span>
       </div>`).join('')}
     ${v.status === 'cancelada' ? `
       <div class="linha-info"><span class="rotulo">Motivo do cancelamento</span>
@@ -410,8 +413,37 @@ async function verVenda(id) {
       caixa.querySelector('[data-r="0"]').addEventListener('click', fecharModal);
       caixa.querySelector('[data-r="0"]').focus();
       caixa.querySelector('[data-r="add"]')?.addEventListener('click', () => abrirAdicionarItens(v));
+      for (const btn of caixa.querySelectorAll('[data-remover-item]')) {
+        btn.addEventListener('click', () => removerItemDaVenda(v, Number(btn.dataset.removerItem), btn.dataset.descricao));
+      }
     }
   });
+}
+
+async function removerItemDaVenda(venda, itemId, descricao) {
+  const motivo = await pedirMotivo({
+    titulo: `Remover "${descricao}"?`,
+    rotuloConfirmar: 'Remover item'
+  });
+  if (!motivo) return;
+
+  // escolherForma() reaproveita o #modal — ao voltar, reabre a venda em vez
+  // de deixar o modal vazio.
+  const pagamento = await escolherForma({
+    titulo: 'Como o valor foi devolvido?',
+    subtitulo: `Removendo "${descricao}" da venda ${String(venda.numero).padStart(6, '0')}.`
+  });
+  if (!pagamento) { verVenda(venda.id); return; }
+
+  const r = await tentar(
+    () => api.vendas.removerItem(venda.id, itemId, { motivo, formaReembolso: pagamento.forma }),
+    { aoFalhar: (e) => toast(e.message, 'err') }
+  );
+  if (r === undefined) return;
+
+  toast(`Item removido — ${formatarBRL(r.reembolsoCentavos)} devolvido(s).`);
+  await verVenda(venda.id);
+  renderizar();
 }
 
 /**
@@ -570,7 +602,10 @@ async function cancelarVenda(id, numero) {
   });
   if (!ok) return;
 
-  const motivo = await pedirMotivo();
+  const motivo = await pedirMotivo({
+    titulo: 'Motivo do cancelamento',
+    rotuloConfirmar: 'Cancelar a venda'
+  });
   if (!motivo) return;
 
   const r = await tentar(() => api.vendas.cancelar({ vendaId: id, motivo }));
@@ -580,15 +615,15 @@ async function cancelarVenda(id, numero) {
   renderizar();
 }
 
-function pedirMotivo() {
+function pedirMotivo({ titulo = 'Motivo', rotuloConfirmar = 'Confirmar' } = {}) {
   return new Promise((resolve) => {
     abrirModal(`
-      <h3>Motivo do cancelamento</h3>
+      <h3>${escapar(titulo)}</h3>
       <div class="sub">Fica registrado para consulta depois. É obrigatório.</div>
       <input id="mc-motivo" type="text" placeholder="Ex.: cliente desistiu, item errado">
       <div class="btn-row">
         <button class="btn btn-ghost" data-r="0">Voltar</button>
-        <button class="btn btn-perigo" data-r="1">Cancelar a venda</button>
+        <button class="btn btn-perigo" data-r="1">${escapar(rotuloConfirmar)}</button>
       </div>
     `, {
       aoMontar(caixa) {
