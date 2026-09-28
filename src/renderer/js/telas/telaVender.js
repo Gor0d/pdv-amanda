@@ -1,7 +1,7 @@
 import { api, tentar, ErroApi } from '../api.js';
 import { $, escapar, aoClicar, mostrarMsg, toast, abrirModal, fecharModal, modalAberto, confirmar } from '../lib/dom.js';
 import { escolherPagamento } from '../lib/pagamento.js';
-import { formatarBRL, formatarQtd, paraMilesimal } from '/compartilhado/formato/moeda.js';
+import { formatarBRL, formatarQtd, paraMilesimal, paraCentavos } from '/compartilhado/formato/moeda.js';
 import { calcularTotais } from '/compartilhado/calculos/totais.js';
 import { formatarDataBR, hojeISO, agoraHora } from '/compartilhado/formato/data.js';
 
@@ -39,6 +39,7 @@ export function montar({ aoFinalizar } = {}) {
     if (acao === 'mais') alterarQtd(Number(el.dataset.i), +1000);
     if (acao === 'menos') alterarQtd(Number(el.dataset.i), -1000);
     if (acao === 'remover') removerItem(Number(el.dataset.i));
+    if (acao === 'editar-preco') { selecionado = Number(el.dataset.i); pedirPreco(); }
   });
 
   instalarAtalhos();
@@ -83,6 +84,7 @@ function instalarAtalhos() {
     switch (e.key) {
       case 'F2': e.preventDefault(); abrirBuscaPorNome(); break;
       case 'F3': e.preventDefault(); pedirQuantidade(); break;
+      case 'F4': e.preventDefault(); pedirPreco(); break;
       case 'F7': e.preventDefault(); removerItem(selecionado); break;
       case 'F8': e.preventDefault(); finalizar(); break;
       case 'F12': e.preventDefault(); cancelarVenda(); break;
@@ -199,7 +201,6 @@ function oferecerCadastroRapido(codigo) {
 }
 
 async function salvarCadastroRapido(codigo, caixa) {
-  const { paraCentavos } = await import('/compartilhado/formato/moeda.js');
   const nome = caixa.querySelector('#qr-nome').value.trim();
   const precoCentavos = paraCentavos(caixa.querySelector('#qr-preco').value);
   const estoqueMilesimal = paraMilesimal(caixa.querySelector('#qr-estoque').value) ?? 0;
@@ -338,6 +339,38 @@ function pedirQuantidade() {
   });
 }
 
+/** Muda o preço só nessa venda — não mexe no cadastro do produto. */
+function pedirPreco() {
+  const item = carrinho[selecionado];
+  if (!item) return;
+  abrirModal(`
+    <h3>Preço unitário</h3>
+    <div class="sub">${escapar(item.nome)} — vale só para esta venda, o cadastro do produto não muda.</div>
+    <input id="pu-valor" type="text" inputmode="decimal" class="mono" value="${(item.precoUnitCentavos / 100).toFixed(2).replace('.', ',')}">
+    <div class="btn-row">
+      <button class="btn btn-ghost" data-r="0">Voltar</button>
+      <button class="btn btn-primary" data-r="1">Aplicar</button>
+    </div>
+  `, {
+    aoMontar(caixa) {
+      const campo = caixa.querySelector('#pu-valor');
+      const aplicar = () => {
+        const novoCentavos = paraCentavos(campo.value);
+        if (novoCentavos === null || novoCentavos < 0) { toast('Informe um preço válido.', 'err'); return; }
+        item.precoUnitCentavos = novoCentavos;
+        fecharModal();
+        renderizar();
+        focarScan();
+      };
+      caixa.querySelector('[data-r="1"]').addEventListener('click', aplicar);
+      caixa.querySelector('[data-r="0"]').addEventListener('click', () => { fecharModal(); focarScan(); });
+      campo.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); aplicar(); } });
+      campo.focus(); campo.select();
+      caixa._aoEscape = () => { fecharModal(); focarScan(); };
+    }
+  });
+}
+
 function removerItem(indice) {
   if (!carrinho[indice]) return;
   carrinho.splice(indice, 1);
@@ -420,7 +453,7 @@ function renderizar() {
           <span class="mono qty">${formatarQtd(i.qtdMilesimal)}</span>
           <button data-acao="mais" data-i="${idx}" title="Aumentar">+</button>
         </span>
-        <span class="price">${formatarBRL(totais.itens[idx].totalItemCentavos)}</span>
+        <span class="price clicavel" data-acao="editar-preco" data-i="${idx}" title="Clique para mudar o preço unitário (F4)">${formatarBRL(totais.itens[idx].totalItemCentavos)}</span>
         <span class="rm" data-acao="remover" data-i="${idx}" title="Remover">✕</span>
       </div>
     `).join('');
