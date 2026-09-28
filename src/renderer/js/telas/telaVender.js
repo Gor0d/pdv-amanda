@@ -339,33 +339,73 @@ function pedirQuantidade() {
   });
 }
 
-/** Muda o preço só nessa venda — não mexe no cadastro do produto. */
+/**
+ * Muda o preço só nessa venda — não mexe no cadastro do produto. Com mais de
+ * 1 unidade na linha, dá pra digitar tanto o preço unitário quanto o total
+ * da linha direto — editar um recalcula o outro. Com rounding de centavo
+ * (a mesma lógica de calcularTotais), o total exibido depois de digitar o
+ * unitário é o total de verdade, não uma conta arredondada por fora.
+ */
 function pedirPreco() {
   const item = carrinho[selecionado];
   if (!item) return;
+  const multiplas = item.qtdMilesimal !== 1000;
+  const totalAtual = Math.round((item.precoUnitCentavos * item.qtdMilesimal) / 1000);
+
   abrirModal(`
-    <h3>Preço unitário</h3>
+    <h3>Preço</h3>
     <div class="sub">${escapar(item.nome)} — vale só para esta venda, o cadastro do produto não muda.</div>
-    <input id="pu-valor" type="text" inputmode="decimal" class="mono" value="${(item.precoUnitCentavos / 100).toFixed(2).replace('.', ',')}">
+    <div class="${multiplas ? 'grid-2' : ''}">
+      <div>
+        <label for="pu-unitario">Preço unitário (R$)</label>
+        <input id="pu-unitario" type="text" inputmode="decimal" class="mono"
+               value="${(item.precoUnitCentavos / 100).toFixed(2).replace('.', ',')}">
+      </div>
+      ${multiplas ? `
+      <div>
+        <label for="pu-total">Total da linha (${formatarQtd(item.qtdMilesimal)} un.) (R$)</label>
+        <input id="pu-total" type="text" inputmode="decimal" class="mono"
+               value="${(totalAtual / 100).toFixed(2).replace('.', ',')}">
+      </div>` : ''}
+    </div>
     <div class="btn-row">
       <button class="btn btn-ghost" data-r="0">Voltar</button>
       <button class="btn btn-primary" data-r="1">Aplicar</button>
     </div>
   `, {
     aoMontar(caixa) {
-      const campo = caixa.querySelector('#pu-valor');
+      const unitario = caixa.querySelector('#pu-unitario');
+      const total = caixa.querySelector('#pu-total');
+      let novoUnitCentavos = item.precoUnitCentavos;
+
+      const aoMudarUnitario = () => {
+        const c = paraCentavos(unitario.value);
+        if (c === null) return;
+        novoUnitCentavos = c;
+        if (total) total.value = (Math.round((c * item.qtdMilesimal) / 1000) / 100).toFixed(2).replace('.', ',');
+      };
+      const aoMudarTotal = () => {
+        const t = paraCentavos(total.value);
+        if (t === null) return;
+        novoUnitCentavos = Math.round((t * 1000) / item.qtdMilesimal);
+        unitario.value = (novoUnitCentavos / 100).toFixed(2).replace('.', ',');
+      };
+
+      unitario.addEventListener('input', aoMudarUnitario);
+      total?.addEventListener('input', aoMudarTotal);
+
       const aplicar = () => {
-        const novoCentavos = paraCentavos(campo.value);
-        if (novoCentavos === null || novoCentavos < 0) { toast('Informe um preço válido.', 'err'); return; }
-        item.precoUnitCentavos = novoCentavos;
+        if (novoUnitCentavos === null || novoUnitCentavos < 0) { toast('Informe um preço válido.', 'err'); return; }
+        item.precoUnitCentavos = novoUnitCentavos;
         fecharModal();
         renderizar();
         focarScan();
       };
       caixa.querySelector('[data-r="1"]').addEventListener('click', aplicar);
       caixa.querySelector('[data-r="0"]').addEventListener('click', () => { fecharModal(); focarScan(); });
-      campo.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); aplicar(); } });
-      campo.focus(); campo.select();
+      unitario.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); aplicar(); } });
+      total?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); aplicar(); } });
+      unitario.focus(); unitario.select();
       caixa._aoEscape = () => { fecharModal(); focarScan(); };
     }
   });
