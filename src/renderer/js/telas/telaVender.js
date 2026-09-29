@@ -11,6 +11,20 @@ let carrinho = [];
 let selecionado = 0;
 let aoFinalizarCallback = null;
 
+// Ajuste sobre o TOTAL da venda (não item a item): positivo é desconto,
+// negativo é acréscimo. Não toca no preço de nenhum produto — é uma linha à
+// parte entre o subtotal e o total, igual desconto de cupom em qualquer
+// mercado.
+let ajusteVendaCentavos = 0;
+
+/** Converte o ajuste único (com sinal) para o formato que calcularTotais e a
+ * API do backend esperam: descontoVenda OU acrescimoCentavos, nunca os dois. */
+function paramsAjusteVenda() {
+  if (ajusteVendaCentavos > 0) return { descontoVenda: { tipo: 'valor', valorCentavos: ajusteVendaCentavos }, acrescimoCentavos: 0 };
+  if (ajusteVendaCentavos < 0) return { descontoVenda: undefined, acrescimoCentavos: -ajusteVendaCentavos };
+  return { descontoVenda: undefined, acrescimoCentavos: 0 };
+}
+
 const scanInput = () => $('#scan-input');
 
 export function montar({ aoFinalizar } = {}) {
@@ -40,6 +54,7 @@ export function montar({ aoFinalizar } = {}) {
     if (acao === 'menos') alterarQtd(Number(el.dataset.i), -1000);
     if (acao === 'remover') removerItem(Number(el.dataset.i));
     if (acao === 'editar-preco') { selecionado = Number(el.dataset.i); pedirPreco(); }
+    if (acao === 'editar-total-venda') pedirTotalVenda();
   });
 
   instalarAtalhos();
@@ -85,6 +100,7 @@ function instalarAtalhos() {
       case 'F2': e.preventDefault(); abrirBuscaPorNome(); break;
       case 'F3': e.preventDefault(); pedirQuantidade(); break;
       case 'F4': e.preventDefault(); pedirPreco(); break;
+      case 'F5': e.preventDefault(); pedirTotalVenda(); break;
       case 'F7': e.preventDefault(); removerItem(selecionado); break;
       case 'F8': e.preventDefault(); finalizar(); break;
       case 'F12': e.preventDefault(); cancelarVenda(); break;
@@ -431,6 +447,69 @@ function pedirPreco() {
   });
 }
 
+/**
+ * Ajusta o TOTAL da venda direto, sem mexer no preço de nenhum item — os
+ * produtos continuam com seus próprios valores, o desconto/acréscimo fica
+ * numa linha à parte entre o subtotal e o total (como desconto de cupom).
+ * Diferente de pedirPreco(): aqui não tem "preço unitário" pra espelhar, só
+ * o total mesmo, então não existe o risco de ida-e-volta com arredondamento.
+ */
+function pedirTotalVenda() {
+  if (!carrinho.length) return;
+  const subtotal = calcularTotais(carrinho).totalCentavos; // soma dos itens, sem o ajuste de venda
+  const totalAtual = subtotal - ajusteVendaCentavos;
+
+  abrirModal(`
+    <h3>Total da venda</h3>
+    <div class="sub">Os preços dos produtos continuam os mesmos — isso só aplica um desconto ou acréscimo na venda toda.</div>
+    <label for="tv-total">Total desejado (R$)</label>
+    <input id="tv-total" type="text" inputmode="decimal" class="mono"
+           value="${(totalAtual / 100).toFixed(2).replace('.', ',')}">
+    <div id="tv-ajuste-msg" class="txt-suave esp-topo-p"></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" data-r="0">Voltar</button>
+      ${ajusteVendaCentavos !== 0 ? '<button class="btn btn-ghost" data-r="limpar">Remover ajuste</button>' : ''}
+      <button class="btn btn-primary" data-r="1">Aplicar</button>
+    </div>
+  `, {
+    aoMontar(caixa) {
+      const campo = caixa.querySelector('#tv-total');
+      const ajusteMsg = caixa.querySelector('#tv-ajuste-msg');
+
+      const mostrarAjuste = () => {
+        const t = paraCentavos(campo.value);
+        if (t === null) { ajusteMsg.textContent = ''; return; }
+        const ajuste = subtotal - t;
+        if (ajuste > 0) ajusteMsg.textContent = `Desconto na venda: ${formatarBRL(ajuste)}`;
+        else if (ajuste < 0) ajusteMsg.textContent = `Acréscimo na venda: ${formatarBRL(-ajuste)}`;
+        else ajusteMsg.textContent = '';
+      };
+      campo.addEventListener('input', mostrarAjuste);
+      mostrarAjuste();
+
+      const aplicar = () => {
+        const t = paraCentavos(campo.value);
+        if (t === null || t < 0) { toast('Informe um total válido.', 'err'); return; }
+        ajusteVendaCentavos = subtotal - t;
+        fecharModal();
+        renderizar();
+        focarScan();
+      };
+      caixa.querySelector('[data-r="1"]').addEventListener('click', aplicar);
+      caixa.querySelector('[data-r="0"]').addEventListener('click', () => { fecharModal(); focarScan(); });
+      caixa.querySelector('[data-r="limpar"]')?.addEventListener('click', () => {
+        ajusteVendaCentavos = 0;
+        fecharModal();
+        renderizar();
+        focarScan();
+      });
+      campo.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); aplicar(); } });
+      campo.focus(); campo.select();
+      caixa._aoEscape = () => { fecharModal(); focarScan(); };
+    }
+  });
+}
+
 function removerItem(indice) {
   if (!carrinho[indice]) return;
   carrinho.splice(indice, 1);
@@ -455,6 +534,7 @@ async function cancelarVenda() {
 function limpar() {
   carrinho = [];
   selecionado = 0;
+  ajusteVendaCentavos = 0;
   renderizar();
   api.vendas.rascunhoLimpar().catch(() => {});
   focarScan();
@@ -465,7 +545,8 @@ function limpar() {
 async function finalizar() {
   if (!carrinho.length) return;
 
-  const totais = calcularTotais(carrinho);
+  const { descontoVenda, acrescimoCentavos } = paramsAjusteVenda();
+  const totais = calcularTotais(carrinho, descontoVenda, acrescimoCentavos);
   const pagamento = await escolherPagamento(totais.totalCentavos);
   if (!pagamento) { focarScan(); return; }
 
@@ -477,6 +558,8 @@ async function finalizar() {
       qtdMilesimal: i.qtdMilesimal,
       descontoItemCentavos: i.descontoItemCentavos || 0
     })),
+    descontoVenda,
+    acrescimoCentavos,
     // Por ora uma forma só por venda, sem split — cobre o pedido de escolher
     // entre dinheiro/pix/débito/crédito sem entrar em pagamento misto ainda.
     pagamentos: [{
@@ -529,8 +612,21 @@ function renderizar() {
     }).join('');
   }
 
-  const total = calcularTotais(carrinho).totalCentavos;
-  $('#cart-total').textContent = formatarBRL(total);
+  const { descontoVenda, acrescimoCentavos } = paramsAjusteVenda();
+  const totalFinal = calcularTotais(carrinho, descontoVenda, acrescimoCentavos).totalCentavos;
+
+  const ajusteEl = $('#receipt-ajuste');
+  if (ajusteVendaCentavos > 0) {
+    ajusteEl.textContent = `Desconto na venda: ${formatarBRL(ajusteVendaCentavos)}`;
+    ajusteEl.classList.remove('oculto');
+  } else if (ajusteVendaCentavos < 0) {
+    ajusteEl.textContent = `Acréscimo na venda: ${formatarBRL(-ajusteVendaCentavos)}`;
+    ajusteEl.classList.remove('oculto');
+  } else {
+    ajusteEl.classList.add('oculto');
+  }
+
+  $('#cart-total').textContent = formatarBRL(totalFinal);
   $('#btn-finalizar').disabled = carrinho.length === 0;
   $('#btn-cancelar').disabled = carrinho.length === 0;
 
@@ -544,7 +640,7 @@ function salvarRascunho() {
   clearTimeout(timerRascunho);
   timerRascunho = setTimeout(() => {
     if (!carrinho.length) return;
-    api.vendas.rascunhoSalvar(JSON.stringify({ carrinho, em: new Date().toISOString() })).catch(() => {});
+    api.vendas.rascunhoSalvar(JSON.stringify({ carrinho, ajusteVendaCentavos, em: new Date().toISOString() })).catch(() => {});
   }, 300);
 }
 
@@ -557,7 +653,10 @@ export async function recuperarRascunho() {
   try { dados = JSON.parse(r.json); } catch { return; }
   if (!dados?.carrinho?.length) return;
 
-  const total = calcularTotais(dados.carrinho).totalCentavos;
+  const ajusteSalvo = dados.ajusteVendaCentavos || 0;
+  const descontoSalvo = ajusteSalvo > 0 ? { tipo: 'valor', valorCentavos: ajusteSalvo } : undefined;
+  const acrescimoSalvo = ajusteSalvo < 0 ? -ajusteSalvo : 0;
+  const total = calcularTotais(dados.carrinho, descontoSalvo, acrescimoSalvo).totalCentavos;
   const ok = await confirmar({
     titulo: 'Havia uma venda em andamento',
     texto: `Encontramos ${dados.carrinho.length} item(ns), total ${formatarBRL(total)}, ` +
@@ -568,6 +667,7 @@ export async function recuperarRascunho() {
   if (ok) {
     carrinho = dados.carrinho;
     selecionado = 0;
+    ajusteVendaCentavos = dados.ajusteVendaCentavos || 0;
     renderizar();
   } else {
     await tentar(() => api.vendas.rascunhoLimpar(), { aoFalhar: () => {} });

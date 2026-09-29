@@ -60,9 +60,11 @@
             <div class="receipt-title">Venda atual</div>
             <div class="receipt-sub" id="receipt-data"></div>
             <div id="receipt-body"></div>
+            <div id="receipt-ajuste" class="receipt-ajuste oculto"></div>
             <div class="rtotal">
               <span class="label">Total</span>
-              <span class="amount" id="cart-total">R$ 0,00</span>
+              <span class="amount clicavel" id="cart-total" data-acao="editar-total-venda"
+                    title="Clique para ajustar o total da venda (F5)">R$ 0,00</span>
             </div>
           </div>
         </div>
@@ -77,6 +79,7 @@
         <div class="linha"><span>Buscar produto por nome</span><kbd>F2</kbd></div>
         <div class="linha"><span>Alterar quantidade</span><kbd>F3</kbd></div>
         <div class="linha"><span>Editar preço unitário</span><kbd>F4</kbd></div>
+        <div class="linha"><span>Desconto/acréscimo na venda</span><kbd>F5</kbd></div>
         <div class="linha"><span>Remover item</span><kbd>F7</kbd></div>
         <div class="linha"><span>Finalizar venda</span><kbd>F8</kbd></div>
         <div class="linha"><span>Cancelar venda</span><kbd>F12</kbd></div>
