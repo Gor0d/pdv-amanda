@@ -7,6 +7,9 @@ import { ratearDesconto, descontoPercentual } from './ratearDesconto.js';
  * vem da tela é conferido contra este resultado, nunca confiado.
  *
  * @param {{precoUnitCentavos:number, qtdMilesimal:number, descontoItemCentavos?:number}[]} itens
+ *        descontoItemCentavos negativo é acréscimo na linha (nunca ultrapassa
+ *        o bruto pra baixo — não dá pra descontar mais do que o item vale —
+ *        mas não tem teto pra cima, um acréscimo pode ser qualquer valor).
  * @param {{tipo?:'valor'|'percentual', valorCentavos?:number, percentual?:number}} descontoVenda
  * @param {number} acrescimoCentavos
  */
@@ -15,7 +18,7 @@ export function calcularTotais(itens, descontoVenda = {}, acrescimoCentavos = 0)
     // Preço × quantidade em milésimos: divide por 1000 e arredonda ao centavo.
     // 0,350 kg × R$ 18,90 = 661,5 centavos → 662.
     const bruto = Math.round((it.precoUnitCentavos * it.qtdMilesimal) / 1000);
-    const descItem = Math.min(Math.max(0, Math.trunc(it.descontoItemCentavos || 0)), bruto);
+    const descItem = Math.min(Math.trunc(it.descontoItemCentavos || 0), bruto);
     return { bruto, descontoItemCentavos: descItem, liquido: bruto - descItem };
   });
 

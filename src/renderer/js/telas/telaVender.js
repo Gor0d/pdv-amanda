@@ -160,6 +160,7 @@ function adicionarAoCarrinho(produto, codigoBarras, qtdMilesimal) {
       codigoBarras,
       precoUnitCentavos: produto.preco_centavos,
       qtdMilesimal,
+      descontoItemCentavos: 0,
       estoqueMilesimal: produto.estoque_milesimal,
       controlaEstoque: !!produto.controla_estoque
     });
@@ -340,17 +341,24 @@ function pedirQuantidade() {
 }
 
 /**
- * Muda o preço só nessa venda — não mexe no cadastro do produto. Com mais de
- * 1 unidade na linha, dá pra digitar tanto o preço unitário quanto o total
- * da linha direto — editar um recalcula o outro. Com rounding de centavo
- * (a mesma lógica de calcularTotais), o total exibido depois de digitar o
- * unitário é o total de verdade, não uma conta arredondada por fora.
+ * Muda o preço só nessa venda — não mexe no cadastro do produto.
+ *
+ * Os dois campos NÃO são espelho um do outro (isso que causava o erro de
+ * 1 centavo: total = unitário×qtd arredondado, e daí recalcular o unitário a
+ * partir desse total já arredondado ia e voltava perdendo centavo). Agora:
+ *   - Editar "Preço unitário" recalcula o total (bruto = unit×qtd) e ZERA
+ *     qualquer desconto/acréscimo anterior — é uma nova base.
+ *   - Editar "Total da linha" NÃO mexe no preço unitário: guarda a diferença
+ *     pro bruto atual como desconto_item_centavos (negativo = acréscimo),
+ *     um inteiro exato, sem dividir nada. O total final bate exatamente com
+ *     o que foi digitado.
  */
 function pedirPreco() {
   const item = carrinho[selecionado];
   if (!item) return;
   const multiplas = item.qtdMilesimal !== 1000;
-  const totalAtual = Math.round((item.precoUnitCentavos * item.qtdMilesimal) / 1000);
+  const bruto = Math.round((item.precoUnitCentavos * item.qtdMilesimal) / 1000);
+  const totalAtual = bruto - (item.descontoItemCentavos || 0);
 
   abrirModal(`
     <h3>Preço</h3>
@@ -368,6 +376,7 @@ function pedirPreco() {
                value="${(totalAtual / 100).toFixed(2).replace('.', ',')}">
       </div>` : ''}
     </div>
+    <div id="pu-ajuste-msg" class="txt-suave esp-topo-p"></div>
     <div class="btn-row">
       <button class="btn btn-ghost" data-r="0">Voltar</button>
       <button class="btn btn-primary" data-r="1">Aplicar</button>
@@ -376,27 +385,38 @@ function pedirPreco() {
     aoMontar(caixa) {
       const unitario = caixa.querySelector('#pu-unitario');
       const total = caixa.querySelector('#pu-total');
-      let novoUnitCentavos = item.precoUnitCentavos;
+      const ajusteMsg = caixa.querySelector('#pu-ajuste-msg');
 
-      const aoMudarUnitario = () => {
-        const c = paraCentavos(unitario.value);
-        if (c === null) return;
-        novoUnitCentavos = c;
-        if (total) total.value = (Math.round((c * item.qtdMilesimal) / 1000) / 100).toFixed(2).replace('.', ',');
-      };
-      const aoMudarTotal = () => {
+      // O que de fato vai ser aplicado, escolhido pelo último campo editado —
+      // nunca os dois ao mesmo tempo, pra não reintroduzir o vai-e-volta.
+      let modo = 'unitario'; // 'unitario' | 'total'
+
+      const mostrarAjuste = () => {
+        if (modo !== 'total') { ajusteMsg.textContent = ''; return; }
         const t = paraCentavos(total.value);
-        if (t === null) return;
-        novoUnitCentavos = Math.round((t * 1000) / item.qtdMilesimal);
-        unitario.value = (novoUnitCentavos / 100).toFixed(2).replace('.', ',');
+        if (t === null) { ajusteMsg.textContent = ''; return; }
+        const ajuste = bruto - t;
+        if (ajuste > 0) ajusteMsg.textContent = `Desconto nesta linha: ${formatarBRL(ajuste)}`;
+        else if (ajuste < 0) ajusteMsg.textContent = `Acréscimo nesta linha: ${formatarBRL(-ajuste)}`;
+        else ajusteMsg.textContent = '';
       };
 
-      unitario.addEventListener('input', aoMudarUnitario);
-      total?.addEventListener('input', aoMudarTotal);
+      unitario.addEventListener('input', () => { modo = 'unitario'; mostrarAjuste(); });
+      total?.addEventListener('input', () => { modo = 'total'; mostrarAjuste(); });
+      mostrarAjuste();
 
       const aplicar = () => {
-        if (novoUnitCentavos === null || novoUnitCentavos < 0) { toast('Informe um preço válido.', 'err'); return; }
-        item.precoUnitCentavos = novoUnitCentavos;
+        if (modo === 'total') {
+          const t = paraCentavos(total.value);
+          if (t === null || t < 0) { toast('Informe um total válido.', 'err'); return; }
+          // Preço unitário fica como estava — só a diferença vira desconto/acréscimo.
+          item.descontoItemCentavos = bruto - t;
+        } else {
+          const c = paraCentavos(unitario.value);
+          if (c === null || c < 0) { toast('Informe um preço válido.', 'err'); return; }
+          item.precoUnitCentavos = c;
+          item.descontoItemCentavos = 0;
+        }
         fecharModal();
         renderizar();
         focarScan();
@@ -454,7 +474,8 @@ async function finalizar() {
       produtoId: i.produtoId,
       codigoBarras: i.codigoBarras,
       precoUnitCentavos: i.precoUnitCentavos,
-      qtdMilesimal: i.qtdMilesimal
+      qtdMilesimal: i.qtdMilesimal,
+      descontoItemCentavos: i.descontoItemCentavos || 0
     })),
     // Por ora uma forma só por venda, sem split — cobre o pedido de escolher
     // entre dinheiro/pix/débito/crédito sem entrar em pagamento misto ainda.
@@ -484,7 +505,14 @@ function renderizar() {
     corpo.innerHTML = '<div class="receipt-empty">Nenhum item bipado ainda</div>';
   } else {
     const totais = calcularTotais(carrinho);
-    corpo.innerHTML = carrinho.map((i, idx) => `
+    corpo.innerHTML = carrinho.map((i, idx) => {
+      const ajuste = totais.itens[idx].descontoItemCentavos;
+      const notaAjuste = ajuste > 0
+        ? `<div class="rline-nota">↳ Desconto nesta linha: ${formatarBRL(ajuste)}</div>`
+        : ajuste < 0
+          ? `<div class="rline-nota">↳ Acréscimo nesta linha: ${formatarBRL(-ajuste)}</div>`
+          : '';
+      return `
       <div class="rline ${idx === selecionado ? 'selecionada' : ''}">
         <span class="name" title="${escapar(i.nome)}">${escapar(i.nome)}</span>
         <span class="leader"></span>
@@ -496,7 +524,9 @@ function renderizar() {
         <span class="price clicavel" data-acao="editar-preco" data-i="${idx}" title="Clique para mudar o preço unitário (F4)">${formatarBRL(totais.itens[idx].totalItemCentavos)}</span>
         <span class="rm" data-acao="remover" data-i="${idx}" title="Remover">✕</span>
       </div>
-    `).join('');
+      ${notaAjuste}
+    `;
+    }).join('');
   }
 
   const total = calcularTotais(carrinho).totalCentavos;

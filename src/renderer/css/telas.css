@@ -52,6 +52,7 @@
   min-width: 78px; text-align: right;
 }
 .rline .rm { color: var(--rust); cursor: pointer; font-size: 15px; margin-left: 4px; }
+.rline-nota { font-size: 11px; color: var(--ink-soft); padding: 0 0 6px 0; margin-top: -5px; }
 
 .rtotal { display: flex; justify-content: space-between; align-items: center; padding: 16px 0 18px 0; }
 .rtotal .label { font-size: 12.5px; text-transform: uppercase; letter-spacing: .8px; color: var(--ink-soft); }

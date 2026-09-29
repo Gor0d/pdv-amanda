@@ -62,6 +62,30 @@ test('total de venda com quantidade fracionada e desconto', () => {
   assert.equal(somaItens + t.acrescimoCentavos, t.totalCentavos);
 });
 
+test('descontoItemCentavos negativo é acréscimo na linha, sem teto', () => {
+  const itens = [
+    { precoUnitCentavos: 390, qtdMilesimal: 3000, descontoItemCentavos: -170 } // 3x3,90=11,70 +1,70
+  ];
+  const t = calcularTotais(itens);
+  assert.equal(t.itens[0].totalItemCentavos, 1170 + 170);
+  assert.equal(t.totalCentavos, 1340);
+});
+
+test('editar o total da linha bate exato, sem sobra de 1 centavo', () => {
+  // O bug relatado: 3 unidades de 3,90 (bruto 11,70), pedindo total 10,00.
+  // A diferença vira desconto exato — nunca dividir e arredondar de volta.
+  const bruto = Math.round((390 * 3000) / 1000);
+  const totalDesejado = 1000;
+  const desconto = bruto - totalDesejado;
+  const t = calcularTotais([{ precoUnitCentavos: 390, qtdMilesimal: 3000, descontoItemCentavos: desconto }]);
+  assert.equal(t.itens[0].totalItemCentavos, totalDesejado);
+});
+
+test('desconto por item nunca ultrapassa o bruto (não fica negativo)', () => {
+  const t = calcularTotais([{ precoUnitCentavos: 100, qtdMilesimal: 1000, descontoItemCentavos: 9999 }]);
+  assert.equal(t.itens[0].totalItemCentavos, 0);
+});
+
 test('troco vem do recebido, não do valor aplicado', () => {
   const s = calcularPagamento(1672, [
     { forma: 'dinheiro', valorCentavos: 1000, recebidoCentavos: 2000 },
