@@ -139,11 +139,20 @@ export function atualizar(id, dados) {
     });
 }
 
-/** Produto nunca é apagado: virou histórico de venda, então só é inativado. */
+/**
+ * Produto nunca é apagado: virou histórico de venda, então só é inativado.
+ * Os códigos de barras SÃO removidos (produto_codigos não é histórico — venda
+ * já guarda o próprio snapshot do código em venda_itens.codigo_barras) pra
+ * liberar o código na hora: excluir e cadastrar um produto novo com o mesmo
+ * código de barras tem que funcionar, não ficar preso ao índice único do
+ * produto antigo.
+ */
 export function inativar(id) {
-  obterBanco()
-    .prepare('UPDATE produtos SET ativo = 0, atualizado_em = ? WHERE id = ?')
-    .run(agoraTimestamp(), id);
+  const db = obterBanco();
+  db.transaction(() => {
+    db.prepare('UPDATE produtos SET ativo = 0, atualizado_em = ? WHERE id = ?').run(agoraTimestamp(), id);
+    db.prepare('DELETE FROM produto_codigos WHERE produto_id = ?').run(id);
+  })();
 }
 
 export function reativar(id) {
@@ -171,9 +180,16 @@ export function removerCodigo(codigoId) {
   obterBanco().prepare('DELETE FROM produto_codigos WHERE id = ?').run(codigoId);
 }
 
+/** Só considera "dono" um produto ATIVO — excluir libera o código pra reuso
+ * num cadastro novo, em vez de prender o código a um produto que já sumiu
+ * da loja. */
 export function donoDoCodigo(codigo) {
   return obterBanco()
-    .prepare('SELECT produto_id FROM produto_codigos WHERE codigo = ?')
+    .prepare(
+      `SELECT c.produto_id FROM produto_codigos c
+         JOIN produtos p ON p.id = c.produto_id
+        WHERE c.codigo = ? AND p.ativo = 1`
+    )
     .get(String(codigo).trim());
 }
 

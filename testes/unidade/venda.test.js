@@ -158,8 +158,30 @@ test('bipar produto inativado não encontra mais (não dá pra vender o que foi 
   produtosRepo.inativar(id);
   assert.equal(produtosRepo.buscarPorCodigo('7891000999999'), null, 'produto inativado não deve mais ser encontrado ao bipar');
 
+  // inativar() também libera o código (produto_codigos não é histórico — a
+  // venda já guarda o snapshot em venda_itens.codigo_barras). Reativar não
+  // devolve o código sozinho: se não foi reaproveitado por outro cadastro,
+  // precisa ser digitado de novo na edição do produto.
   produtosRepo.reativar(id);
-  assert.ok(produtosRepo.buscarPorCodigo('7891000999999'), 'reativado volta a ser encontrado');
+  assert.equal(produtosRepo.codigosDe(id).length, 0, 'reativar não restaura os códigos removidos');
+});
+
+test('excluir um produto libera o código de barras pra um cadastro novo', () => {
+  bancoLimpo();
+  const antigoId = criarProduto({ nome: 'Caixa de Som Antiga', precoCentavos: 10000, codigo: '7890653331896' });
+
+  // Antes da correção, isto falhava: UNIQUE em produto_codigos.codigo impedia
+  // o INSERT mesmo com o dono antigo inativo.
+  produtosRepo.inativar(antigoId);
+  assert.equal(produtosRepo.donoDoCodigo('7890653331896'), undefined, 'código não deve mais ter dono ativo');
+
+  const novoId = produtosRepo.criar({
+    nome: 'Caixa de Som Nova', precoCentavos: 15000, codigos: ['7890653331896']
+  });
+
+  const achado = produtosRepo.buscarPorCodigo('7890653331896');
+  assert.ok(achado, 'o novo cadastro deve ser encontrado pelo código reaproveitado');
+  assert.equal(achado.produto.id, novoId);
 });
 
 test('recalcularCache conserta divergência entre cache e ledger', () => {
