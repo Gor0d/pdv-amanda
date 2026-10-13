@@ -27,6 +27,11 @@ function paramsAjusteVenda() {
 
 const scanInput = () => $('#scan-input');
 
+/** Passo do +/-: 1 unidade inteira pra UN, 0,1 (100g/100mL) pra quem vende por peso/volume. */
+function passoQtd(item) {
+  return !item || item.unidade === 'UN' ? 1000 : 100;
+}
+
 export function montar({ aoFinalizar } = {}) {
   aoFinalizarCallback = aoFinalizar;
   const secao = $('#tab-vender');
@@ -50,8 +55,8 @@ export function montar({ aoFinalizar } = {}) {
     }
     if (acao === 'cancelar-venda') cancelarVenda();
     if (acao === 'finalizar') finalizar();
-    if (acao === 'mais') alterarQtd(Number(el.dataset.i), +1000);
-    if (acao === 'menos') alterarQtd(Number(el.dataset.i), -1000);
+    if (acao === 'mais') { const i = Number(el.dataset.i); alterarQtd(i, passoQtd(carrinho[i])); }
+    if (acao === 'menos') { const i = Number(el.dataset.i); alterarQtd(i, -passoQtd(carrinho[i])); }
     if (acao === 'remover') removerItem(Number(el.dataset.i));
     if (acao === 'editar-preco') { selecionado = Number(el.dataset.i); pedirPreco(); }
     if (acao === 'editar-total-venda') pedirTotalVenda();
@@ -111,10 +116,10 @@ function instalarAtalhos() {
         if (carrinho.length) { e.preventDefault(); selecionado = Math.min(carrinho.length - 1, selecionado + 1); renderizar(); }
         break;
       case '+': case '=':
-        if (carrinho.length && scanInput().value === '') { e.preventDefault(); alterarQtd(selecionado, +1000); }
+        if (carrinho.length && scanInput().value === '') { e.preventDefault(); alterarQtd(selecionado, passoQtd(carrinho[selecionado])); }
         break;
       case '-':
-        if (carrinho.length && scanInput().value === '') { e.preventDefault(); alterarQtd(selecionado, -1000); }
+        if (carrinho.length && scanInput().value === '') { e.preventDefault(); alterarQtd(selecionado, -passoQtd(carrinho[selecionado])); }
         break;
       case 'Escape':
         if (scanInput().value) { scanInput().value = ''; }
@@ -132,11 +137,13 @@ function instalarAtalhos() {
 async function bipar(entrada) {
   let quantidade = 1000;
   let codigo = entrada;
+  let pesoExplicito = false;
 
   const mult = entrada.match(/^(\d+(?:[.,]\d+)?)\s*[*x]\s*(.+)$/i);
   if (mult) {
     quantidade = paraMilesimal(mult[1]) ?? 1000;
     codigo = mult[2].trim();
+    pesoExplicito = true;
   }
 
   const achado = await tentar(() => api.produtos.buscarPorCodigo(codigo));
@@ -149,10 +156,16 @@ async function bipar(entrada) {
   }
 
   const { produto, codigo: codigoEncontrado, fatorMilesimal } = achado;
-  adicionarAoCarrinho(produto, codigoEncontrado, (quantidade * fatorMilesimal) / 1000);
+  adicionarAoCarrinho(produto, codigoEncontrado, (quantidade * fatorMilesimal) / 1000, pesoExplicito);
 }
 
-function adicionarAoCarrinho(produto, codigoBarras, qtdMilesimal) {
+/**
+ * pesoExplicito=true quando a quantidade já veio digitada (ex.: "0,350*código"
+ * ou editada na busca por nome) — nesse caso não reabre o pedido de peso.
+ * Produto vendido por peso/volume (unidade != UN) sem peso explícito sempre
+ * para e pergunta, em vez de assumir "1" (1kg por engano é prejuízo real).
+ */
+function adicionarAoCarrinho(produto, codigoBarras, qtdMilesimal, pesoExplicito = false) {
   const existente = carrinho.find((i) => i.produtoId === produto.id);
   const jaNoCarrinho = existente?.qtdMilesimal ?? 0;
 
@@ -165,6 +178,7 @@ function adicionarAoCarrinho(produto, codigoBarras, qtdMilesimal) {
     return;
   }
 
+  let itemNovo = false;
   if (existente) {
     existente.qtdMilesimal += qtdMilesimal;
     selecionado = carrinho.indexOf(existente);
@@ -181,11 +195,17 @@ function adicionarAoCarrinho(produto, codigoBarras, qtdMilesimal) {
       controlaEstoque: !!produto.controla_estoque
     });
     selecionado = carrinho.length - 1;
+    itemNovo = true;
   }
 
   mostrarMsg('#scan-msg', `${produto.nome} — ${formatarBRL(produto.preco_centavos)}`, 'ok', 3);
   renderizar();
-  focarScan();
+
+  if (itemNovo && !pesoExplicito && produto.unidade !== 'UN') {
+    pedirQuantidade(); // produto vendido por peso: confirma o valor pesado em vez de assumir "1".
+  } else {
+    focarScan();
+  }
 }
 
 function oferecerCadastroRapido(codigo) {
@@ -321,12 +341,15 @@ function alterarQtd(indice, delta) {
   renderizar();
 }
 
+const TITULO_QTD_POR_UNIDADE = { UN: 'Quantidade', KG: 'Peso (kg)', G: 'Peso (g)', L: 'Volume (L)' };
+
 function pedirQuantidade() {
   const item = carrinho[selecionado];
   if (!item) return;
+  const titulo = TITULO_QTD_POR_UNIDADE[item.unidade] || 'Quantidade';
   abrirModal(`
-    <h3>Quantidade</h3>
-    <div class="sub">${escapar(item.nome)}</div>
+    <h3>${titulo}</h3>
+    <div class="sub">${escapar(item.nome)}${item.unidade !== 'UN' ? ' — digite o valor da balança' : ''}</div>
     <input id="q-valor" type="text" inputmode="decimal" class="mono" value="${formatarQtd(item.qtdMilesimal)}">
     <div class="btn-row">
       <button class="btn btn-ghost" data-r="0">Voltar</button>
@@ -601,7 +624,7 @@ function renderizar() {
         <span class="leader"></span>
         <span class="qty-ctrl">
           <button data-acao="menos" data-i="${idx}" title="Diminuir">−</button>
-          <span class="mono qty">${formatarQtd(i.qtdMilesimal)}</span>
+          <span class="mono qty">${formatarQtd(i.qtdMilesimal)}${i.unidade !== 'UN' ? ` ${i.unidade.toLowerCase()}` : ''}</span>
           <button data-acao="mais" data-i="${idx}" title="Aumentar">+</button>
         </span>
         <span class="price clicavel" data-acao="editar-preco" data-i="${idx}" title="Clique para mudar o preço unitário (F4)">${formatarBRL(totais.itens[idx].totalItemCentavos)}</span>

@@ -135,7 +135,16 @@
       </div>
       <div class="form-grid produto-precos esp-topo-p">
         <div>
-          <label for="p-custo">Preço de compra (R$)</label>
+          <label for="p-unidade">Unidade de venda</label>
+          <select id="p-unidade">
+            <option value="UN">Unidade (un)</option>
+            <option value="KG">Peso (kg)</option>
+            <option value="G">Peso (g)</option>
+            <option value="L">Volume (L)</option>
+          </select>
+        </div>
+        <div>
+          <label for="p-custo" id="p-custo-label">Preço de compra (R$)</label>
           <input id="p-custo" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off">
         </div>
         <div>
@@ -147,14 +156,15 @@
           <input id="p-lucro" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off">
         </div>
         <div>
-          <label for="p-preco">Preço de venda (R$)</label>
+          <label for="p-preco" id="p-preco-label">Preço de venda (R$)</label>
           <input id="p-preco" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off">
         </div>
         <div>
-          <label for="p-estoque">Estoque</label>
+          <label for="p-estoque" id="p-estoque-label">Estoque</label>
           <input id="p-estoque" type="text" inputmode="decimal" placeholder="0" autocomplete="off">
         </div>
       </div>
+      <p class="txt-suave esp-topo-p" id="p-unidade-dica"></p>
       <div class="grid-2 esp-topo-p">
         <div>
           <label for="p-fornecedor">Fornecedor</label>

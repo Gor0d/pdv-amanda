@@ -16,7 +16,7 @@ export function montar() {
     if (acao === 'cancelar-edicao') limparFormulario();
     if (acao === 'editar') editar(id);
     if (acao === 'inativar') inativar(id, el.dataset.nome);
-    if (acao === 'entrada') abrirEntrada(id, el.dataset.nome);
+    if (acao === 'entrada') abrirEntrada(id, el.dataset.nome, el.dataset.unidade);
   });
 
   $('#p-busca').addEventListener('input', renderizar);
@@ -29,7 +29,42 @@ export function montar() {
     });
   }
 
+  $('#p-unidade').addEventListener('change', atualizarRotulosUnidade);
+  atualizarRotulosUnidade();
+
   instalarCalculoPreco();
+}
+
+// --------------------------------- Unidade ---------------------------------
+//
+// Produto vendido por peso/volume (kg, g, L) usa o mesmo preco_centavos e
+// estoque_milesimal de sempre — só muda o que esses números SIGNIFICAM (preço
+// por kg em vez de por unidade, estoque em kg em vez de em peças). Por isso
+// não precisou mexer no banco nem no cálculo: só relabelar os campos.
+
+const ROTULOS_UNIDADE = {
+  UN: { preco: 'Preço de venda (R$)', custo: 'Preço de compra (R$)', estoque: 'Estoque', dica: '' },
+  KG: {
+    preco: 'Preço por kg (R$)', custo: 'Custo por kg (R$)', estoque: 'Estoque (kg)',
+    dica: 'Vendido por peso: no caixa, o operador digita o peso pesado na balança em vez de bipar unidade por unidade.'
+  },
+  G: {
+    preco: 'Preço por grama (R$)', custo: 'Custo por grama (R$)', estoque: 'Estoque (g)',
+    dica: 'Vendido por peso: no caixa, o operador digita o peso em vez de bipar unidade por unidade.'
+  },
+  L: {
+    preco: 'Preço por litro (R$)', custo: 'Custo por litro (R$)', estoque: 'Estoque (L)',
+    dica: 'Vendido por volume: no caixa, o operador digita a quantidade em litros em vez de bipar unidade por unidade.'
+  }
+};
+
+function atualizarRotulosUnidade() {
+  const unidade = $('#p-unidade').value;
+  const r = ROTULOS_UNIDADE[unidade] || ROTULOS_UNIDADE.UN;
+  $('#p-preco-label').textContent = r.preco;
+  $('#p-custo-label').textContent = r.custo;
+  $('#p-estoque-label').textContent = r.estoque;
+  $('#p-unidade-dica').textContent = r.dica;
 }
 
 // --------------------------- Calculadora de preço -------------------------
@@ -130,6 +165,7 @@ async function salvar() {
   const custoCentavos = custoTexto ? paraCentavos(custoTexto) : null;
   const validade = $('#p-validade').value || null;
   const fornecedorId = $('#p-fornecedor').value ? Number($('#p-fornecedor').value) : null;
+  const unidade = $('#p-unidade').value;
 
   if (!nome) return mostrarMsg('#p-msg', 'Informe o nome do produto.', 'err');
   if (precoCentavos === null) return mostrarMsg('#p-msg', 'Informe um preço válido (ex.: 5,49).', 'err');
@@ -137,7 +173,7 @@ async function salvar() {
 
   if (editandoId) {
     const ok = await tentar(
-      () => api.produtos.atualizar(editandoId, { nome, precoCentavos, custoCentavos, validade, fornecedorId }),
+      () => api.produtos.atualizar(editandoId, { nome, precoCentavos, custoCentavos, validade, fornecedorId, unidade }),
       { aoFalhar: (e) => mostrarMsg('#p-msg', e.message, 'err') }
     );
     if (ok === undefined) return;
@@ -168,7 +204,7 @@ async function salvar() {
   } else {
     const id = await tentar(
       () => api.produtos.criar({
-        nome, precoCentavos, custoCentavos, validade, fornecedorId, codigos: codigo ? [codigo] : []
+        nome, precoCentavos, custoCentavos, validade, fornecedorId, unidade, codigos: codigo ? [codigo] : []
       }),
       { aoFalhar: (e) => mostrarMsg('#p-msg', e.message, 'err') }
     );
@@ -208,6 +244,8 @@ async function editar(id) {
   $('#p-estoque').value = formatarQtd(p.estoque_milesimal);
   $('#p-validade').value = p.validade ?? '';
   $('#p-fornecedor').value = p.fornecedor_id ?? '';
+  $('#p-unidade').value = p.unidade || 'UN';
+  atualizarRotulosUnidade();
   $('#form-titulo').textContent = `Editando: ${p.nome}`;
   $('#p-acoes-edicao').style.display = 'flex';
   esconderMsg('#p-msg');
@@ -221,6 +259,8 @@ function limparFormulario() {
     $(c).value = '';
   }
   $('#p-fornecedor').value = '';
+  $('#p-unidade').value = 'UN';
+  atualizarRotulosUnidade();
   $('#form-titulo').textContent = 'Cadastrar produto';
   $('#p-acoes-edicao').style.display = 'none';
   esconderMsg('#p-msg');
@@ -239,12 +279,16 @@ async function inativar(id, nome) {
   renderizar();
 }
 
-function abrirEntrada(id, nome) {
+function abrirEntrada(id, nome, unidade) {
+  const rotuloQtd = unidade === 'KG' ? 'Peso que chegou (kg)'
+    : unidade === 'G' ? 'Peso que chegou (g)'
+    : unidade === 'L' ? 'Volume que chegou (L)'
+    : 'Quantidade que chegou';
   abrirModal(`
     <h3>Entrada de estoque</h3>
     <div class="sub">${escapar(nome)}</div>
     <div class="grid-campos">
-      <div><label for="e-qtd">Quantidade que chegou</label>
+      <div><label for="e-qtd">${rotuloQtd}</label>
            <input id="e-qtd" type="text" inputmode="decimal" class="mono" placeholder="0"></div>
       <div><label for="e-motivo">Motivo / nota</label>
            <input id="e-motivo" type="text" placeholder="Ex.: compra do fornecedor"></div>
@@ -313,7 +357,7 @@ async function renderizar() {
     <table>
       <thead>
         <tr>
-          <th>Código</th><th>Nome</th><th class="num">Custo</th><th class="num">Preço</th>
+          <th>Código</th><th>Nome</th><th>Un.</th><th class="num">Custo</th><th class="num">Preço</th>
           <th class="num">Margem</th><th class="num">Estoque</th><th>Validade</th><th>Fornecedor</th><th></th>
         </tr>
       </thead>
@@ -322,14 +366,15 @@ async function renderizar() {
           <tr class="${p.estoque_milesimal === 0 ? 'zero' : (p.estoque_milesimal <= minimo ? 'low' : '')}">
             <td class="mono">${escapar(p.codigo ?? '—')}</td>
             <td>${escapar(p.nome)}</td>
-            <td class="num">${p.custo_centavos != null ? formatarBRL(p.custo_centavos) : '—'}</td>
-            <td class="num">${formatarBRL(p.preco_centavos)}</td>
+            <td class="mono">${escapar(p.unidade)}</td>
+            <td class="num">${p.custo_centavos != null ? formatarBRL(p.custo_centavos) : '—'}${p.unidade !== 'UN' ? `/${p.unidade.toLowerCase()}` : ''}</td>
+            <td class="num">${formatarBRL(p.preco_centavos)}${p.unidade !== 'UN' ? `/${p.unidade.toLowerCase()}` : ''}</td>
             <td class="num">${calcularMargem(p.custo_centavos, p.preco_centavos)}</td>
             <td class="num stockcell">${p.controla_estoque ? formatarQtd(p.estoque_milesimal) : '—'}</td>
             <td class="${classeValidade(p.validade)}">${p.validade ? formatarDataBR(p.validade) : '—'}</td>
             <td>${escapar(p.fornecedor_nome ?? '—')}</td>
             <td class="acoes-linha">
-              <button class="icon-btn" data-acao="entrada" data-id="${p.id}" data-nome="${escapar(p.nome)}" title="Entrada de estoque">↓</button>
+              <button class="icon-btn" data-acao="entrada" data-id="${p.id}" data-nome="${escapar(p.nome)}" data-unidade="${p.unidade}" title="Entrada de estoque">↓</button>
               <button class="icon-btn" data-acao="editar" data-id="${p.id}" title="Editar">✎</button>
               <button class="icon-btn del" data-acao="inativar" data-id="${p.id}" data-nome="${escapar(p.nome)}" title="Tirar da lista">🗑</button>
             </td>
