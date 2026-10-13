@@ -24,7 +24,7 @@ export function buscarPorCodigo(codigoBipado) {
   const stmt = db.prepare(
     `SELECT ${CAMPOS}, c.codigo AS codigo_encontrado, c.fator_milesimal
        FROM produto_codigos c JOIN produtos p ON p.id = c.produto_id
-      WHERE c.codigo = ?`
+      WHERE c.codigo = ? AND p.ativo = 1`
   );
 
   for (const variacao of variacoesCodigo(codigoBipado)) {

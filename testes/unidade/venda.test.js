@@ -150,6 +150,18 @@ test('busca por código encontra apesar da diferença UPC-A / EAN-13', () => {
   assert.equal(r.produto.id, id);
 });
 
+test('bipar produto inativado não encontra mais (não dá pra vender o que foi excluído)', () => {
+  bancoLimpo();
+  const id = criarProduto({ nome: 'Descontinuado', precoCentavos: 500, codigo: '7891000999999' });
+  assert.ok(produtosRepo.buscarPorCodigo('7891000999999'), 'produto ativo deve ser encontrado');
+
+  produtosRepo.inativar(id);
+  assert.equal(produtosRepo.buscarPorCodigo('7891000999999'), null, 'produto inativado não deve mais ser encontrado ao bipar');
+
+  produtosRepo.reativar(id);
+  assert.ok(produtosRepo.buscarPorCodigo('7891000999999'), 'reativado volta a ser encontrado');
+});
+
 test('recalcularCache conserta divergência entre cache e ledger', () => {
   bancoLimpo();
   const id = criarProduto({ nome: 'X', precoCentavos: 100, estoque: 10 });
